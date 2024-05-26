@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func getDNSAnswers(domain string, recordType uint16, dnsClient *dns.Client, dnsServerAddress string) ([]dns.RR, error) {
+func GetDNSAnswers(domain string, recordType uint16, dnsClient *dns.Client, dnsServerAddress string) ([]dns.RR, error) {
 	dnsMessage := &dns.Msg{}
 	dnsMessage.SetQuestion(dns.Fqdn(domain), recordType)
 
@@ -37,22 +37,24 @@ func getDNSAnswers(domain string, recordType uint16, dnsClient *dns.Client, dnsS
 	return in.Answer, nil
 }
 
-func getDNSRecords(
+func GetDNSAnswerStrings(
 	domain string,
 	recordType uint16,
 	dnsClient *dns.Client,
 	dnsServerAddress string,
 	recurseCname bool,
-) (records []string, err error) {
-	answers, err := getDNSAnswers(domain, recordType, dnsClient, dnsServerAddress)
+) ([]string, error) {
+	answers, err := GetDNSAnswers(domain, recordType, dnsClient, dnsServerAddress)
 	if err != nil {
 		return nil, err
 	}
 
+	var answerStrings []string
+
 	for _, answer := range answers {
 		if answer.Header().Rrtype == dns.TypeCNAME && recurseCname {
 			if t, ok := answer.(*dns.CNAME); ok {
-				recursiveLookupCname, err := getDNSRecords(
+				recursiveLookupCname, err := GetDNSAnswerStrings(
 					t.Target,
 					recordType,
 					dnsClient,
@@ -66,7 +68,7 @@ func getDNSRecords(
 						err,
 					)
 				}
-				records = append(records, recursiveLookupCname...)
+				answerStrings = append(answerStrings, recursiveLookupCname...)
 				continue
 			}
 			answer.Header().Rrtype = recordType
@@ -74,24 +76,24 @@ func getDNSRecords(
 
 		switch dnsRec := answer.(type) {
 		case *dns.A:
-			records = append(records, dnsRec.A.String())
+			answerStrings = append(answerStrings, dnsRec.A.String())
 		case *dns.AAAA:
-			records = append(records, dnsRec.AAAA.String())
+			answerStrings = append(answerStrings, dnsRec.AAAA.String())
 		case *dns.MX:
-			records = append(records, dnsRec.Mx)
+			answerStrings = append(answerStrings, dnsRec.Mx)
 		case *dns.NS:
-			records = append(records, dnsRec.Ns)
+			answerStrings = append(answerStrings, dnsRec.Ns)
 		case *dns.TXT:
-			records = append(records, strings.Join(dnsRec.Txt, ""))
+			answerStrings = append(answerStrings, strings.Join(dnsRec.Txt, ""))
 		case *dns.CNAME:
-			records = append(records, dnsRec.Target)
+			answerStrings = append(answerStrings, dnsRec.Target)
 		}
 	}
 
-	return records, nil
+	return answerStrings, nil
 }
 
-func getDnsServers() ([]string, error) {
+func GetDNSServers() ([]string, error) {
 	file, err := os.Open("/etc/resolv.conf")
 	if err != nil {
 		return nil, err
