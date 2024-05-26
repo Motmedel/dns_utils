@@ -114,3 +114,23 @@ func GetDNSServers() ([]string, error) {
 
 	return dnsServers, nil
 }
+
+func GetPrefixedTXTRecordString(
+	domain string,
+	prefix string,
+	dnsClient *dns.Client,
+	dnsServerAddress string,
+) (string, error) {
+	answerStrings, err := GetDNSAnswerStrings(domain, dns.TypeTXT, dnsClient, dnsServerAddress, true)
+	if err != nil {
+		return "", err
+	}
+
+	for _, answerString := range answerStrings {
+		if strings.HasPrefix(answerString, prefix) {
+			return answerString, nil
+		}
+	}
+
+	return "", nil
+}
