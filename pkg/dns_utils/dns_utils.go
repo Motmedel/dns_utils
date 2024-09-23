@@ -26,12 +26,11 @@ func GetDNSAnswers(domain string, recordType uint16, dnsClient *dns.Client, dnsS
 
 	dnsMessage := &dns.Msg{}
 	dnsMessage.SetQuestion(dns.Fqdn(domain), recordType)
-	dnsMessage.SetEdns0(4096, true)
 
 	in, _, err := dnsClient.Exchange(dnsMessage, dnsServerAddress)
 	if err != nil {
 		return nil, &motmedelErrors.CauseError{
-			Message: "An error occurred when performing the DNS exchange",
+			Message: "An error occurred when performing the DNS exchange.",
 			Cause:   err,
 		}
 	}
@@ -42,6 +41,26 @@ func GetDNSAnswers(domain string, recordType uint16, dnsClient *dns.Client, dnsS
 		}
 
 		return nil, &dnsUtilsErrors.RcodeError{Rcode: in.Rcode}
+	}
+
+	if in.MsgHdr.Truncated {
+		tcpDnsClient := *dnsClient
+		tcpDnsClient.Net = "tcp"
+		in, _, err = tcpDnsClient.Exchange(dnsMessage, dnsServerAddress)
+		if err != nil {
+			return nil, &motmedelErrors.CauseError{
+				Message: "An error occurred when performing the DNS exchange.",
+				Cause:   err,
+			}
+		}
+
+		if in.Rcode != dns.RcodeSuccess {
+			if in.Rcode == dns.RcodeNameError {
+				return nil, nil
+			}
+
+			return nil, &dnsUtilsErrors.RcodeError{Rcode: in.Rcode}
+		}
 	}
 
 	return in.Answer, nil
@@ -173,7 +192,7 @@ func GetPrefixedTXTRecordString(
 	answerStrings, err := GetDNSAnswerStrings(domain, dns.TypeTXT, dnsClient, dnsServerAddress, true)
 	if err != nil {
 		return "", &motmedelErrors.InputError{
-			Message: "An error occurred when getting TXT DNS answer strings..",
+			Message: "An error occurred when getting TXT DNS answer strings.",
 			Cause:   err,
 			Input:   domain,
 		}
