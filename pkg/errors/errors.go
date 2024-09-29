@@ -2,7 +2,7 @@ package errors
 
 import (
 	"errors"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"fmt"
 )
 
 var (
@@ -14,10 +14,13 @@ var (
 )
 
 type RcodeError struct {
-	motmedelErrors.CauseError
 	Rcode int
 }
 
 func (rcodeError *RcodeError) Is(target error) bool {
 	return target == ErrUnsuccessfulRcode
+}
+
+func (rcodeError *RcodeError) Error() string {
+	return fmt.Sprintf("%s: %d", ErrUnsuccessfulRcode, rcodeError.Rcode)
 }

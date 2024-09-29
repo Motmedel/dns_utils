@@ -7,6 +7,7 @@ import (
 	"github.com/miekg/dns"
 	"os"
 	"strings"
+	"sync"
 )
 
 const resolvePath = "/etc/resolv.conf"
@@ -225,4 +226,108 @@ func GetPrefixedTxtRecordString(
 	}
 
 	return "", nil
+}
+
+type ActiveResult struct {
+	Domain         string
+	AddressRecords []dns.RR
+	MxRecords      []dns.RR
+}
+
+func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (*ActiveResult, error) {
+	if domain == "" {
+		return nil, nil
+	}
+
+	if client == nil {
+		return nil, dnsUtilsErrors.ErrNilDnsClient
+	}
+
+	if serverAddress == "" {
+		return nil, dnsUtilsErrors.ErrEmptyDnsServer
+	}
+
+	var addressRecords []dns.RR
+	var addressRecordsMutex sync.Mutex
+	var numGoroutines int
+	errorChannel := make(chan error)
+
+	numGoroutines += 1
+	go func() {
+		errorChannel <- func() error {
+			message := &dns.Msg{}
+			message.SetQuestion(dns.Fqdn(domain), dns.TypeA)
+			message.RecursionDesired = false
+
+			aAnswers, err := GetDnsAnswersWithMessage(message, client, serverAddress)
+			if err != nil {
+				return &motmedelErrors.InputError{
+					Message: "An error occurred when querying for A records.",
+					Cause:   err,
+					Input:   domain,
+				}
+			}
+
+			addressRecordsMutex.Lock()
+			addressRecords = append(addressRecords, aAnswers...)
+			addressRecordsMutex.Unlock()
+
+			return nil
+		}()
+	}()
+
+	numGoroutines += 1
+	go func() {
+		errorChannel <- func() error {
+			message := &dns.Msg{}
+			message.SetQuestion(dns.Fqdn(domain), dns.TypeAAAA)
+			message.RecursionDesired = false
+
+			aaaaAnswers, err := GetDnsAnswersWithMessage(message, client, serverAddress)
+			if err != nil {
+				return &motmedelErrors.InputError{
+					Message: "An error occurred when querying for AAAA records.",
+					Cause:   err,
+					Input:   domain,
+				}
+			}
+
+			addressRecordsMutex.Lock()
+			addressRecords = append(addressRecords, aaaaAnswers...)
+			addressRecordsMutex.Unlock()
+
+			return nil
+		}()
+	}()
+
+	var mxAnswers []dns.RR
+
+	numGoroutines += 1
+	go func() {
+		errorChannel <- func() error {
+			message := &dns.Msg{}
+			message.SetQuestion(dns.Fqdn(domain), dns.TypeMX)
+			message.RecursionDesired = false
+
+			var err error
+			mxAnswers, err = GetDnsAnswersWithMessage(message, client, serverAddress)
+			if err != nil {
+				return &motmedelErrors.InputError{
+					Message: "An error occurred when querying for MX records.",
+					Cause:   err,
+					Input:   domain,
+				}
+			}
+
+			return nil
+		}()
+	}()
+
+	for i := 0; i < numGoroutines; i++ {
+		if err := <-errorChannel; err != nil {
+			return nil, err
+		}
+	}
+
+	return &ActiveResult{Domain: domain, AddressRecords: addressRecords, MxRecords: mxAnswers}, nil
 }
