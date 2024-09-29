@@ -255,11 +255,7 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 	numGoroutines += 1
 	go func() {
 		errorChannel <- func() error {
-			message := &dns.Msg{}
-			message.SetQuestion(dns.Fqdn(domain), dns.TypeA)
-			message.RecursionDesired = false
-
-			aAnswers, err := GetDnsAnswersWithMessage(message, client, serverAddress)
+			aAnswers, err := GetDnsAnswers(domain, dns.TypeA, client, serverAddress)
 			if err != nil {
 				return &motmedelErrors.InputError{
 					Message: "An error occurred when querying for A records.",
@@ -279,11 +275,7 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 	numGoroutines += 1
 	go func() {
 		errorChannel <- func() error {
-			message := &dns.Msg{}
-			message.SetQuestion(dns.Fqdn(domain), dns.TypeAAAA)
-			message.RecursionDesired = false
-
-			aaaaAnswers, err := GetDnsAnswersWithMessage(message, client, serverAddress)
+			aaaaAnswers, err := GetDnsAnswers(domain, dns.TypeAAAA, client, serverAddress)
 			if err != nil {
 				return &motmedelErrors.InputError{
 					Message: "An error occurred when querying for AAAA records.",
