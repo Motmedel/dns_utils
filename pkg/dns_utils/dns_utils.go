@@ -305,12 +305,8 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 	numGoroutines += 1
 	go func() {
 		errorChannel <- func() error {
-			message := &dns.Msg{}
-			message.SetQuestion(dns.Fqdn(domain), dns.TypeMX)
-			message.RecursionDesired = false
-
 			var err error
-			mxAnswers, err = GetDnsAnswersWithMessage(message, client, serverAddress)
+			mxAnswers, err = GetDnsAnswers(domain, dns.TypeMX, client, serverAddress)
 			if err != nil {
 				return &motmedelErrors.InputError{
 					Message: "An error occurred when querying for MX records.",
