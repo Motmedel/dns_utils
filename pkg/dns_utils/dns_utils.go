@@ -229,9 +229,10 @@ func GetPrefixedTxtRecordString(
 }
 
 type ActiveResult struct {
-	Domain         string
-	AddressRecords []dns.RR
-	MxRecords      []dns.RR
+	Domain    string
+	Cnames    []string
+	Addresses []string
+	MxHosts   []string
 }
 
 func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (*ActiveResult, error) {
@@ -247,10 +248,13 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 		return nil, dnsUtilsErrors.ErrEmptyDnsServer
 	}
 
-	var addressRecords []dns.RR
+	var cnames []string
+	var addressRecords []string
 	var addressRecordsMutex sync.Mutex
 	var numGoroutines int
 	errorChannel := make(chan error)
+
+	var once sync.Once
 
 	numGoroutines += 1
 	go func() {
@@ -264,9 +268,21 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 				}
 			}
 
-			addressRecordsMutex.Lock()
-			addressRecords = append(addressRecords, aAnswers...)
-			addressRecordsMutex.Unlock()
+			var aCnames []string
+			for _, answer := range aAnswers {
+				switch typedAnswer := answer.(type) {
+				case *dns.A:
+					addressRecordsMutex.Lock()
+					addressRecords = append(addressRecords, typedAnswer.A.String())
+					addressRecordsMutex.Unlock()
+				case *dns.CNAME:
+					aCnames = append(aCnames, typedAnswer.Target)
+				}
+			}
+
+			once.Do(func() {
+				cnames = aCnames
+			})
 
 			return nil
 		}()
@@ -284,26 +300,45 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 				}
 			}
 
-			addressRecordsMutex.Lock()
-			addressRecords = append(addressRecords, aaaaAnswers...)
-			addressRecordsMutex.Unlock()
+			var aaaaCnames []string
+			for _, answer := range aaaaAnswers {
+				switch typedAnswer := answer.(type) {
+				case *dns.AAAA:
+					addressRecordsMutex.Lock()
+					addressRecords = append(addressRecords, typedAnswer.AAAA.String())
+					addressRecordsMutex.Unlock()
+				case *dns.CNAME:
+					aaaaCnames = append(aaaaCnames, typedAnswer.Target)
+				}
+			}
+
+			once.Do(func() {
+				cnames = aaaaCnames
+			})
 
 			return nil
 		}()
 	}()
 
-	var mxAnswers []dns.RR
+	var mxHosts []string
 
 	numGoroutines += 1
 	go func() {
 		errorChannel <- func() error {
 			var err error
-			mxAnswers, err = GetDnsAnswers(domain, dns.TypeMX, client, serverAddress)
+			mxAnswers, err := GetDnsAnswers(domain, dns.TypeMX, client, serverAddress)
 			if err != nil {
 				return &motmedelErrors.InputError{
 					Message: "An error occurred when querying for MX records.",
 					Cause:   err,
 					Input:   domain,
+				}
+			}
+
+			for _, answer := range mxAnswers {
+				switch typedAnswer := answer.(type) {
+				case *dns.MX:
+					mxHosts = append(mxHosts, typedAnswer.Mx)
 				}
 			}
 
@@ -317,5 +352,5 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 		}
 	}
 
-	return &ActiveResult{Domain: domain, AddressRecords: addressRecords, MxRecords: mxAnswers}, nil
+	return &ActiveResult{Domain: domain, Cnames: cnames, Addresses: addressRecords, MxHosts: mxHosts}, nil
 }
