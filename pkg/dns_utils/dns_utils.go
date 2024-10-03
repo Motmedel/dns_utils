@@ -188,44 +188,46 @@ func GetDnsServers() ([]string, error) {
 	return dnsServers, nil
 }
 
-func GetPrefixedTxtRecordString(
+func GetPrefixedTxtRecordStrings(
 	domain string,
 	prefix string,
 	dnsClient *dns.Client,
 	dnsServerAddress string,
-) (string, error) {
+) ([]string, error) {
 	if domain == "" {
-		return "", nil
+		return nil, nil
 	}
 
 	if prefix == "" {
-		return "", dnsUtilsErrors.ErrEmptyPrefix
+		return nil, dnsUtilsErrors.ErrEmptyPrefix
 	}
 
 	if dnsClient == nil {
-		return "", dnsUtilsErrors.ErrNilDnsClient
+		return nil, dnsUtilsErrors.ErrNilDnsClient
 	}
 
 	if dnsServerAddress == "" {
-		return "", dnsUtilsErrors.ErrEmptyDnsServer
+		return nil, dnsUtilsErrors.ErrEmptyDnsServer
 	}
 
 	answerStrings, err := GetDnsAnswerStrings(domain, dns.TypeTXT, dnsClient, dnsServerAddress, true)
 	if err != nil {
-		return "", &motmedelErrors.InputError{
+		return nil, &motmedelErrors.InputError{
 			Message: "An error occurred when getting TXT DNS answer strings.",
 			Cause:   err,
 			Input:   domain,
 		}
 	}
 
+	var prefixedAnswerStrings []string
+
 	for _, answerString := range answerStrings {
 		if strings.HasPrefix(answerString, prefix) {
-			return answerString, nil
+			prefixedAnswerStrings = append(prefixedAnswerStrings, answerString)
 		}
 	}
 
-	return "", nil
+	return prefixedAnswerStrings, nil
 }
 
 type ActiveResult struct {
