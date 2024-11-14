@@ -92,7 +92,6 @@ func GetDnsAnswerStrings(
 	recordType uint16,
 	dnsClient *dns.Client,
 	dnsServerAddress string,
-	recurseCname bool,
 ) ([]string, error) {
 	if domain == "" {
 		return nil, nil
@@ -121,28 +120,6 @@ func GetDnsAnswerStrings(
 	var answerStrings []string
 
 	for _, answer := range answers {
-		if answer.Header().Rrtype == dns.TypeCNAME && recurseCname {
-			if t, ok := answer.(*dns.CNAME); ok {
-				recursiveLookupCname, err := GetDnsAnswerStrings(
-					t.Target,
-					recordType,
-					dnsClient,
-					dnsServerAddress,
-					recurseCname,
-				)
-				if err != nil {
-					return nil, &motmedelErrors.InputError{
-						Message: "An error occurred when getting DNS answers strings.",
-						Cause:   err,
-						Input:   t.Target,
-					}
-				}
-				answerStrings = append(answerStrings, recursiveLookupCname...)
-				continue
-			}
-			answer.Header().Rrtype = recordType
-		}
-
 		switch dnsRec := answer.(type) {
 		case *dns.A:
 			answerStrings = append(answerStrings, dnsRec.A.String())
@@ -210,7 +187,7 @@ func GetPrefixedTxtRecordStrings(
 		return nil, dnsUtilsErrors.ErrEmptyDnsServer
 	}
 
-	answerStrings, err := GetDnsAnswerStrings(domain, dns.TypeTXT, dnsClient, dnsServerAddress, true)
+	answerStrings, err := GetDnsAnswerStrings(domain, dns.TypeTXT, dnsClient, dnsServerAddress)
 	if err != nil {
 		return nil, &motmedelErrors.InputError{
 			Message: "An error occurred when getting TXT DNS answer strings.",
