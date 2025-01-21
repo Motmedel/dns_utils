@@ -128,11 +128,11 @@ func GetDnsAnswerStrings(
 	for _, answer := range answers {
 		switch typedAnswer := answer.(type) {
 		case *dns.A:
-			if a := typedAnswer.A; len(a) != 0 {
+			if a := typedAnswer.A; a != nil {
 				answerStrings = append(answerStrings, a.String())
 			}
 		case *dns.AAAA:
-			if aaaa := typedAnswer.AAAA; len(aaaa) != 0 {
+			if aaaa := typedAnswer.AAAA; aaaa != nil {
 				answerStrings = append(answerStrings, aaaa.String())
 			}
 		case *dns.MX:
