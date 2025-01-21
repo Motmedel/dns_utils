@@ -32,6 +32,9 @@ func GetDnsAnswersWithMessage(message *dns.Msg, client *dns.Client, serverAddres
 			Cause:   err,
 		}
 	}
+	if in == nil {
+		return nil, dnsUtilsErrors.ErrNilExchangeMessage
+	}
 
 	if in.Rcode != dns.RcodeSuccess {
 		if in.Rcode == dns.RcodeNameError {
@@ -50,6 +53,9 @@ func GetDnsAnswersWithMessage(message *dns.Msg, client *dns.Client, serverAddres
 				Message: "An error occurred when performing the DNS exchange with a TCP client.",
 				Cause:   err,
 			}
+		}
+		if in == nil {
+			return nil, dnsUtilsErrors.ErrNilExchangeMessage
 		}
 
 		if in.Rcode != dns.RcodeSuccess {
@@ -120,19 +126,23 @@ func GetDnsAnswerStrings(
 	var answerStrings []string
 
 	for _, answer := range answers {
-		switch dnsRec := answer.(type) {
+		switch typedAnswer := answer.(type) {
 		case *dns.A:
-			answerStrings = append(answerStrings, dnsRec.A.String())
+			if a := typedAnswer.A; len(a) != 0 {
+				answerStrings = append(answerStrings, a.String())
+			}
 		case *dns.AAAA:
-			answerStrings = append(answerStrings, dnsRec.AAAA.String())
+			if aaaa := typedAnswer.AAAA; len(aaaa) != 0 {
+				answerStrings = append(answerStrings, aaaa.String())
+			}
 		case *dns.MX:
-			answerStrings = append(answerStrings, dnsRec.Mx)
+			answerStrings = append(answerStrings, typedAnswer.Mx)
 		case *dns.NS:
-			answerStrings = append(answerStrings, dnsRec.Ns)
+			answerStrings = append(answerStrings, typedAnswer.Ns)
 		case *dns.TXT:
-			answerStrings = append(answerStrings, strings.Join(dnsRec.Txt, ""))
+			answerStrings = append(answerStrings, strings.Join(typedAnswer.Txt, ""))
 		case *dns.CNAME:
-			answerStrings = append(answerStrings, dnsRec.Target)
+			answerStrings = append(answerStrings, typedAnswer.Target)
 		}
 	}
 
