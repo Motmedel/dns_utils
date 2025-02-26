@@ -2,6 +2,7 @@ package dns_utils
 
 import (
 	"bufio"
+	"fmt"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/miekg/dns"
@@ -18,22 +19,23 @@ func GetDnsAnswersWithMessage(message *dns.Msg, client *dns.Client, serverAddres
 	}
 
 	if client == nil {
-		return nil, dnsUtilsErrors.ErrNilDnsClient
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
 	if serverAddress == "" {
-		return nil, dnsUtilsErrors.ErrEmptyDnsServer
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
 	in, _, err := client.Exchange(message, serverAddress)
 	if err != nil {
-		return nil, &motmedelErrors.CauseError{
-			Message: "An error occurred when performing the DNS exchange.",
-			Cause:   err,
-		}
+		return nil, motmedelErrors.MakeErrorWithStackTrace(
+			fmt.Errorf("dns client exchange: %w", err),
+			message,
+			serverAddress,
+		)
 	}
 	if in == nil {
-		return nil, dnsUtilsErrors.ErrNilExchangeMessage
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilExchangeMessage)
 	}
 
 	if in.Rcode != dns.RcodeSuccess {
@@ -41,7 +43,7 @@ func GetDnsAnswersWithMessage(message *dns.Msg, client *dns.Client, serverAddres
 			return nil, nil
 		}
 
-		return nil, &dnsUtilsErrors.RcodeError{Rcode: in.Rcode}
+		return nil, motmedelErrors.MakeErrorWithStackTrace(&dnsUtilsErrors.RcodeError{Rcode: in.Rcode})
 	}
 
 	if in.MsgHdr.Truncated {
@@ -49,13 +51,14 @@ func GetDnsAnswersWithMessage(message *dns.Msg, client *dns.Client, serverAddres
 		tcpDnsClient.Net = "tcp"
 		in, _, err = tcpDnsClient.Exchange(message, serverAddress)
 		if err != nil {
-			return nil, &motmedelErrors.CauseError{
-				Message: "An error occurred when performing the DNS exchange with a TCP client.",
-				Cause:   err,
-			}
+			return nil, motmedelErrors.MakeErrorWithStackTrace(
+				fmt.Errorf("dns client exchange (tcp): %w", err),
+				message,
+				serverAddress,
+			)
 		}
 		if in == nil {
-			return nil, dnsUtilsErrors.ErrNilExchangeMessage
+			return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilExchangeMessage)
 		}
 
 		if in.Rcode != dns.RcodeSuccess {
@@ -63,7 +66,7 @@ func GetDnsAnswersWithMessage(message *dns.Msg, client *dns.Client, serverAddres
 				return nil, nil
 			}
 
-			return nil, &dnsUtilsErrors.RcodeError{Rcode: in.Rcode}
+			return nil, motmedelErrors.MakeErrorWithStackTrace(&dnsUtilsErrors.RcodeError{Rcode: in.Rcode})
 		}
 	}
 
@@ -76,15 +79,15 @@ func GetDnsAnswers(domain string, recordType uint16, client *dns.Client, serverA
 	}
 
 	if recordType == 0 {
-		return nil, dnsUtilsErrors.ErrUnsetRecordType
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrUnsetRecordType)
 	}
 
 	if client == nil {
-		return nil, dnsUtilsErrors.ErrNilDnsClient
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
 	if serverAddress == "" {
-		return nil, dnsUtilsErrors.ErrEmptyDnsServer
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
 	message := &dns.Msg{}
@@ -104,23 +107,26 @@ func GetDnsAnswerStrings(
 	}
 
 	if recordType == 0 {
-		return nil, dnsUtilsErrors.ErrUnsetRecordType
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrUnsetRecordType)
 	}
 
 	if dnsClient == nil {
-		return nil, dnsUtilsErrors.ErrNilDnsClient
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
 	if dnsServerAddress == "" {
-		return nil, dnsUtilsErrors.ErrEmptyDnsServer
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
 	answers, err := GetDnsAnswers(domain, recordType, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, &motmedelErrors.CauseError{
-			Message: "An error occurred when getting DNS answers.",
-			Cause:   err,
-		}
+		return nil, motmedelErrors.MakeError(
+			fmt.Errorf("get dns answers: %w", err),
+			domain,
+			recordType,
+			dnsClient,
+			dnsServerAddress,
+		)
 	}
 
 	var answerStrings []string
@@ -152,11 +158,7 @@ func GetDnsAnswerStrings(
 func GetDnsServers() ([]string, error) {
 	file, err := os.Open(resolvePath)
 	if err != nil {
-		return nil, &motmedelErrors.InputError{
-			Message: "An error occurred when opening the resolve file.",
-			Cause:   err,
-			Input:   resolvePath,
-		}
+		return nil, motmedelErrors.MakeErrorWithStackTrace(fmt.Errorf("os open: %w", err), resolvePath)
 	}
 	defer file.Close()
 
@@ -186,24 +188,23 @@ func GetPrefixedTxtRecordStrings(
 	}
 
 	if prefix == "" {
-		return nil, dnsUtilsErrors.ErrEmptyPrefix
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrEmptyPrefix)
 	}
 
 	if dnsClient == nil {
-		return nil, dnsUtilsErrors.ErrNilDnsClient
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
 	if dnsServerAddress == "" {
-		return nil, dnsUtilsErrors.ErrEmptyDnsServer
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
 	answerStrings, err := GetDnsAnswerStrings(domain, dns.TypeTXT, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, &motmedelErrors.InputError{
-			Message: "An error occurred when getting TXT DNS answer strings.",
-			Cause:   err,
-			Input:   domain,
-		}
+		return nil, motmedelErrors.MakeError(
+			fmt.Errorf("get dns answer strings: %w", err),
+			domain, dnsClient, dnsServerAddress,
+		)
 	}
 
 	var prefixedAnswerStrings []string
@@ -230,11 +231,11 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 	}
 
 	if client == nil {
-		return nil, dnsUtilsErrors.ErrNilDnsClient
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
 	if serverAddress == "" {
-		return nil, dnsUtilsErrors.ErrEmptyDnsServer
+		return nil, motmedelErrors.MakeErrorWithStackTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
 	var cnames []string
@@ -250,11 +251,10 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 		errorChannel <- func() error {
 			aAnswers, err := GetDnsAnswers(domain, dns.TypeA, client, serverAddress)
 			if err != nil {
-				return &motmedelErrors.InputError{
-					Message: "An error occurred when querying for A records.",
-					Cause:   err,
-					Input:   domain,
-				}
+				return motmedelErrors.MakeError(
+					fmt.Errorf("get dns answers (a): %w", err),
+					domain, client, serverAddress,
+				)
 			}
 
 			var aCnames []string
@@ -282,11 +282,10 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 		errorChannel <- func() error {
 			aaaaAnswers, err := GetDnsAnswers(domain, dns.TypeAAAA, client, serverAddress)
 			if err != nil {
-				return &motmedelErrors.InputError{
-					Message: "An error occurred when querying for AAAA records.",
-					Cause:   err,
-					Input:   domain,
-				}
+				return motmedelErrors.MakeError(
+					fmt.Errorf("get dns answers (aaaa): %w", err),
+					domain, client, serverAddress,
+				)
 			}
 
 			var aaaaCnames []string
@@ -317,11 +316,10 @@ func GetActiveRecords(domain string, client *dns.Client, serverAddress string) (
 			var err error
 			mxAnswers, err := GetDnsAnswers(domain, dns.TypeMX, client, serverAddress)
 			if err != nil {
-				return &motmedelErrors.InputError{
-					Message: "An error occurred when querying for MX records.",
-					Cause:   err,
-					Input:   domain,
-				}
+				return motmedelErrors.MakeError(
+					fmt.Errorf("get dns answers (mx): %w", err),
+					domain, client, serverAddress,
+				)
 			}
 
 			for _, answer := range mxAnswers {
