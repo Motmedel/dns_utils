@@ -45,7 +45,6 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 	ecsDns.HeaderFlags = dns_utils.GetFlagsFromMessage(message)
 	ecsDns.Id = strconv.Itoa(int(message.Id))
 	ecsDns.OpCode = dns.OpcodeToString[message.Opcode]
-	ecsDns.ResponseCode = dns.RcodeToString[message.Rcode]
 
 	if question != nil {
 		var domainBreakdown motmedelNet.DomainBreakdown
@@ -99,6 +98,7 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 	ecsDns.ResolvedIp = motmedelIter.Set(resolvedIps)
 
 	if isAnswer {
+		ecsDns.ResponseCode = dns.RcodeToString[message.Rcode]
 		ecsDns.Type = "answer"
 	} else {
 		ecsDns.Type = "question"
