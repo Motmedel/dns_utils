@@ -9,6 +9,7 @@ import (
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/miekg/dns"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"strings"
 	"sync"
@@ -54,6 +55,8 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	in, _, err := client.Exchange(message, serverAddress)
 	dnsContext, ok := ctx.Value(*dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
 	if ok && dnsContext != nil {
+		dnsContext.ServerAddress = serverAddress
+		dnsContext.Transport = client.Net
 		dnsContext.QuestionMessage = message
 		dnsContext.AnswerMessage = in
 	}
@@ -81,6 +84,8 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		tcpDnsClient.Net = "tcp"
 		in, _, err = tcpDnsClient.Exchange(message, serverAddress)
 		if dnsContext != nil {
+			dnsContext.ServerAddress = serverAddress
+			dnsContext.Transport = tcpDnsClient.Net
 			dnsContext.QuestionMessage = message
 			dnsContext.AnswerMessage = in
 		}
@@ -258,80 +263,71 @@ func GetActiveRecords(
 	var cnames []string
 	var addressRecords []string
 	var addressRecordsMutex sync.Mutex
-	var numGoroutines int
-	errorChannel := make(chan error)
 
 	var once sync.Once
 
-	// TODO: Use `errgroup` instead?
+	errGroup, _ := errgroup.WithContext(context.Background())
 
-	numGoroutines += 1
-	go func() {
-		errorChannel <- func() error {
-			aAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeA, client, serverAddress)
-			if err != nil {
-				return motmedelErrors.New(
-					fmt.Errorf("get dns answers (a): %w", err),
-					domain, client, serverAddress,
-				)
+	errGroup.Go(func() error {
+		aAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeA, client, serverAddress)
+		if err != nil {
+			return motmedelErrors.New(
+				fmt.Errorf("get dns answers (a): %w", err),
+				domain, client, serverAddress,
+			)
+		}
+
+		var aCnames []string
+		for _, answer := range aAnswers {
+			switch typedAnswer := answer.(type) {
+			case *dns.A:
+				addressRecordsMutex.Lock()
+				addressRecords = append(addressRecords, typedAnswer.A.String())
+				addressRecordsMutex.Unlock()
+			case *dns.CNAME:
+				aCnames = append(aCnames, typedAnswer.Target)
 			}
+		}
 
-			var aCnames []string
-			for _, answer := range aAnswers {
-				switch typedAnswer := answer.(type) {
-				case *dns.A:
-					addressRecordsMutex.Lock()
-					addressRecords = append(addressRecords, typedAnswer.A.String())
-					addressRecordsMutex.Unlock()
-				case *dns.CNAME:
-					aCnames = append(aCnames, typedAnswer.Target)
-				}
+		once.Do(func() {
+			cnames = aCnames
+		})
+
+		return nil
+	})
+
+	errGroup.Go(func() error {
+		aaaaAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeAAAA, client, serverAddress)
+		if err != nil {
+			return motmedelErrors.New(
+				fmt.Errorf("get dns answers (aaaa): %w", err),
+				domain, client, serverAddress,
+			)
+		}
+
+		var aaaaCnames []string
+		for _, answer := range aaaaAnswers {
+			switch typedAnswer := answer.(type) {
+			case *dns.AAAA:
+				addressRecordsMutex.Lock()
+				addressRecords = append(addressRecords, typedAnswer.AAAA.String())
+				addressRecordsMutex.Unlock()
+			case *dns.CNAME:
+				aaaaCnames = append(aaaaCnames, typedAnswer.Target)
 			}
+		}
 
-			once.Do(func() {
-				cnames = aCnames
-			})
+		once.Do(func() {
+			cnames = aaaaCnames
+		})
 
-			return nil
-		}()
-	}()
-
-	numGoroutines += 1
-	go func() {
-		errorChannel <- func() error {
-			aaaaAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeAAAA, client, serverAddress)
-			if err != nil {
-				return motmedelErrors.New(
-					fmt.Errorf("get dns answers (aaaa): %w", err),
-					domain, client, serverAddress,
-				)
-			}
-
-			var aaaaCnames []string
-			for _, answer := range aaaaAnswers {
-				switch typedAnswer := answer.(type) {
-				case *dns.AAAA:
-					addressRecordsMutex.Lock()
-					addressRecords = append(addressRecords, typedAnswer.AAAA.String())
-					addressRecordsMutex.Unlock()
-				case *dns.CNAME:
-					aaaaCnames = append(aaaaCnames, typedAnswer.Target)
-				}
-			}
-
-			once.Do(func() {
-				cnames = aaaaCnames
-			})
-
-			return nil
-		}()
-	}()
+		return nil
+	})
 
 	var mxHosts []string
 
-	numGoroutines += 1
-	go func() {
-		errorChannel <- func() error {
+	errGroup.Go(
+		func() error {
 			var err error
 			mxAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeMX, client, serverAddress)
 			if err != nil {
@@ -349,13 +345,11 @@ func GetActiveRecords(
 			}
 
 			return nil
-		}()
-	}()
+		},
+	)
 
-	for i := 0; i < numGoroutines; i++ {
-		if err := <-errorChannel; err != nil {
-			return nil, err
-		}
+	if err := errGroup.Wait(); err != nil {
+		return nil, fmt.Errorf("errgroup wait: %w", err)
 	}
 
 	return &dnsUtilsTypes.ActiveResult{Domain: domain, Cnames: cnames, Addresses: addressRecords, MxHosts: mxHosts}, nil

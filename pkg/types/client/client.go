@@ -2,8 +2,11 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
+	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
+	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
 
@@ -32,9 +35,22 @@ func (client *Client) GetActiveRecords(domain string) (*dnsUtilsTypes.ActiveResu
 	return dns_utils.GetActiveRecords(domain, client.Client, client.Address)
 }
 
-func New(serverAddress string) *Client {
-	return &Client{
-		Client:  new(dns.Client),
-		Address: serverAddress,
+func NewWithAddress(address string) (*Client, error) {
+	if address == "" {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
+	return &Client{Client: new(dns.Client), Address: address}, nil
+}
+
+func New() (*Client, error) {
+	dnsServerAddresses, err := dns_utils.GetDnsServers()
+	if err != nil {
+		return nil, fmt.Errorf("get dns servers: %w", err)
+	}
+
+	if len(dnsServerAddresses) == 0 {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+	}
+
+	return NewWithAddress(dnsServerAddresses[0])
 }
