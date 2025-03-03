@@ -52,5 +52,5 @@ func New() (*Client, error) {
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
-	return NewWithAddress(dnsServerAddresses[0])
+	return NewWithAddress(dnsServerAddresses[0] + ":53")
 }
