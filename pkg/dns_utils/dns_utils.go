@@ -33,9 +33,16 @@ func GetFlagsFromMessage(message *dns.Msg) []string {
 	if message.CheckingDisabled {
 		flags = append(flags, "CD")
 	}
-	if message.Response {
-		flags = append(flags, "QR")
+
+	for _, extra := range message.Extra {
+		if opt, ok := extra.(*dns.OPT); ok && opt != nil {
+			if opt.Do() {
+				flags = append(flags, "DO")
+			}
+			break
+		}
 	}
+
 	if message.RecursionAvailable {
 		flags = append(flags, "RA")
 	}
@@ -44,9 +51,6 @@ func GetFlagsFromMessage(message *dns.Msg) []string {
 	}
 	if message.Truncated {
 		flags = append(flags, "TC")
-	}
-	if message.Zero {
-		flags = append(flags, "Z")
 	}
 
 	return flags
