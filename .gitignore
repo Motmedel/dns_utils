@@ -22,3 +22,5 @@ go.work
 
 .idea
 *.iml
+
+/cmd/txt_retriever/txt_retriever
