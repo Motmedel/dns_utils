@@ -17,6 +17,41 @@ import (
 
 const resolvePath = "/etc/resolv.conf"
 
+func GetFlagsFromMessage(message *dns.Msg) []string {
+	if message == nil {
+		return nil
+	}
+
+	var flags []string
+
+	if message.Authoritative {
+		flags = append(flags, "AA")
+	}
+	if message.AuthenticatedData {
+		flags = append(flags, "AD")
+	}
+	if message.CheckingDisabled {
+		flags = append(flags, "CD")
+	}
+	if message.Response {
+		flags = append(flags, "QR")
+	}
+	if message.RecursionAvailable {
+		flags = append(flags, "RA")
+	}
+	if message.RecursionDesired {
+		flags = append(flags, "RD")
+	}
+	if message.Truncated {
+		flags = append(flags, "TC")
+	}
+	if message.Zero {
+		flags = append(flags, "Z")
+	}
+
+	return flags
+}
+
 func GetDnsServers() ([]string, error) {
 	file, err := os.Open(resolvePath)
 	if err != nil {
