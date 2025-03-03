@@ -141,6 +141,31 @@ func GetDnsAnswers(
 	return GetDnsAnswersWithMessage(ctx, message, client, serverAddress)
 }
 
+func GetAnswerString(answer dns.RR) string {
+	switch typedAnswer := answer.(type) {
+	case *dns.A:
+		if a := typedAnswer.A; a != nil {
+			return a.String()
+		}
+	case *dns.AAAA:
+		if aaaa := typedAnswer.AAAA; aaaa != nil {
+			return aaaa.String()
+		}
+	case *dns.MX:
+		return typedAnswer.Mx
+	case *dns.NS:
+		return typedAnswer.Ns
+	case *dns.TXT:
+		return strings.Join(typedAnswer.Txt, "")
+	case *dns.CNAME:
+		return typedAnswer.Target
+	}
+
+	// TODO: There could be more types...
+
+	return ""
+}
+
 func GetDnsAnswerStrings(
 	ctx context.Context,
 	domain string,
@@ -178,23 +203,8 @@ func GetDnsAnswerStrings(
 	var answerStrings []string
 
 	for _, answer := range answers {
-		switch typedAnswer := answer.(type) {
-		case *dns.A:
-			if a := typedAnswer.A; a != nil {
-				answerStrings = append(answerStrings, a.String())
-			}
-		case *dns.AAAA:
-			if aaaa := typedAnswer.AAAA; aaaa != nil {
-				answerStrings = append(answerStrings, aaaa.String())
-			}
-		case *dns.MX:
-			answerStrings = append(answerStrings, typedAnswer.Mx)
-		case *dns.NS:
-			answerStrings = append(answerStrings, typedAnswer.Ns)
-		case *dns.TXT:
-			answerStrings = append(answerStrings, strings.Join(typedAnswer.Txt, ""))
-		case *dns.CNAME:
-			answerStrings = append(answerStrings, typedAnswer.Target)
+		if answerString := GetAnswerString(answer); answerString != "" {
+			answerStrings = append(answerStrings, answerString)
 		}
 	}
 
