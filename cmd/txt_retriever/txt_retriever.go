@@ -121,7 +121,7 @@ func main() {
 							domain, dnsServerAddress,
 						),
 					),
-					"An error occurred when retrieving SPF TXT records.",
+					"An error occurred when retrieving TXT records.",
 				)
 				return
 			}
