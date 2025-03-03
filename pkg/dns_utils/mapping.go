@@ -1,6 +1,6 @@
 package dns_utils
 
-var RcodeToString = map[int]string{
+var RcodeToString = map[uint16]string{
 	0:  "NOERROR",
 	1:  "FORMERR",
 	2:  "SERVFAIL",
@@ -22,7 +22,7 @@ var RcodeToString = map[int]string{
 	23: "BADCOOKIE",
 }
 
-var ClassToString = map[int]string{
+var ClassToString = map[uint16]string{
 	1:   "IN",
 	2:   "CSNET",
 	3:   "CHAOS",
