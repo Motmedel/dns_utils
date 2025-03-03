@@ -10,7 +10,6 @@ var (
 	ErrUnsetRecordType    = errors.New("unset record type")
 	ErrUnsuccessfulRcode  = errors.New("unsuccessful rcode")
 	ErrEmptyDnsServer     = errors.New("empty dns server")
-	ErrEmptyPrefix        = errors.New("empty prefix")
 	ErrNilExchangeMessage = errors.New("nil exchange message")
 	ErrMultipleRecords    = errors.New("multiple records")
 )

@@ -261,10 +261,6 @@ func GetPrefixedTxtRecordStrings(
 		return nil, nil
 	}
 
-	if prefix == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyPrefix)
-	}
-
 	if dnsClient == nil {
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
