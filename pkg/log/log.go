@@ -1,23 +1,28 @@
-package log
+package main
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
+	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	"github.com/Motmedel/ecs_go/ecs"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	motmedelIter "github.com/Motmedel/utils_go/pkg/iter"
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
-	"github.com/Motmedel/utils_go/pkg/net"
+	motmedelNet "github.com/Motmedel/utils_go/pkg/net"
 	"github.com/Motmedel/utils_go/pkg/net/domain_breakdown"
 	"github.com/miekg/dns"
 	"log/slog"
+	"net"
+	"strconv"
+	"strings"
 )
 
-func ParseDnsMessage(message *dns.Msg) *ecs.Base {
-	if message == nil {
-		return nil
+func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
+	if base == nil {
+		return
 	}
 
 	var question *dns.Question
@@ -28,88 +33,158 @@ func ParseDnsMessage(message *dns.Msg) *ecs.Base {
 	answers := message.Answer
 
 	if question == nil && len(answers) == 0 {
-		return nil
+		return
 	}
 
-	var ecsDns ecs.Dns
-	base := &ecs.Base{Dns: &ecsDns, Network: &ecs.Network{Protocol: "dns"}}
+	ecsDns := base.Dns
+	if ecsDns == nil {
+		ecsDns = &ecs.Dns{}
+		base.Dns = ecsDns
+	}
+
+	ecsDns.HeaderFlags = dns_utils.GetFlagsFromMessage(message)
+	ecsDns.Id = strconv.Itoa(int(message.Id))
+	ecsDns.OpCode = dns.OpcodeToString[message.Opcode]
+	ecsDns.ResponseCode = dns.RcodeToString[message.Rcode]
 
 	if question != nil {
-		var domainBreakdown net.DomainBreakdown
-		if parsedDomainBreakdown := domain_breakdown.GetDomainBreakdown(question.Name); parsedDomainBreakdown != nil {
+		var domainBreakdown motmedelNet.DomainBreakdown
+
+		parsedDomainBreakdown := domain_breakdown.GetDomainBreakdown(strings.TrimSuffix(question.Name, "."))
+		if parsedDomainBreakdown != nil {
 			domainBreakdown = *parsedDomainBreakdown
 		}
 
 		ecsDns.Question = &ecs.DnsQuestion{
 			DomainBreakdown: domainBreakdown,
-			Class:           "",
-			Name:            "",
-			Type:            "",
+			Class:           dns.ClassToString[question.Qclass],
+			Name:            strings.TrimSuffix(question.Name, "."),
+			Type:            dns.TypeToString[question.Qtype],
 		}
 	}
 
-	//for _, answer := range answers {
-	//	ecsDns.Answers = append(
-	//		ecsDns.Answers,
-	//		&ecs.DnsAnswer{},
-	//	)
-	//}
+	var isAnswer bool
+	var resolvedIps []string
+
+	for _, answer := range answers {
+		if answer == nil {
+			continue
+		}
+
+		answerHeader := answer.Header()
+		if answerHeader == nil {
+			continue
+		}
+
+		isAnswer = true
+		answerType := dns.TypeToString[answerHeader.Rrtype]
+		answerData := dns_utils.GetAnswerString(answer)
+
+		if answerType == "A" || answerType == "AAAA" {
+			resolvedIps = append(resolvedIps, answerData)
+		}
+
+		ecsDns.Answers = append(
+			ecsDns.Answers,
+			&ecs.DnsAnswer{
+				Class: dns.ClassToString[answerHeader.Class],
+				Data:  answerData,
+				Name:  strings.TrimSuffix(answerHeader.Name, "."),
+				Ttl:   int(answerHeader.Ttl),
+				Type:  answerType,
+			},
+		)
+	}
+
+	ecsDns.ResolvedIp = motmedelIter.Set(resolvedIps)
+
+	if isAnswer {
+		ecsDns.Type = "answer"
+	} else {
+		ecsDns.Type = "question"
+	}
+}
+
+func ParseDnsMessage(message *dns.Msg) *ecs.Base {
+	if message == nil {
+		return nil
+	}
+
+	base := &ecs.Base{Network: &ecs.Network{Protocol: "dns"}}
+	EnrichWithDnsMessage(base, message)
 
 	return base
 }
-
-//func ParseDnsExchange(question *dns.Question, answers []dns.RR) *ecs.Base {
-//	if question == nil && len(answers) == 0 {
-//		return nil
-//	}
-//
-//	base := &ecs.Base{
-//		Network: &ecs.Network{
-//			Protocol: "dns",
-//
-//		},
-//	}
-//
-//}
 
 func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 	if dnsContext == nil {
 		return nil
 	}
 
-	//var question *dns.Question
-	//if questionMessage := dnsContext.QuestionMessage; questionMessage != nil {
-	//	// Not sure if it makes sense to have multiple questions?
-	//	if questions := questionMessage.Question; len(questions) > 0 {
-	//		question = &questions[0]
-	//	}
-	//}
-	//
-	//var answers []dns.RR
-	//if answersMessage := dnsContext.AnswerMessage; answersMessage != nil {
-	//	answers = answersMessage.Answer
-	//}
+	var message *dns.Msg
+	if answersMessage := dnsContext.AnswerMessage; answersMessage != nil {
+		message = answersMessage
+	} else if questionMessage := dnsContext.QuestionMessage; questionMessage != nil {
+		message = questionMessage
+	}
 
-	//return ParseDnsExchange(question, answers)
+	if message == nil {
+		return nil
+	}
 
-	return nil
+	transport := strings.ToLower(dnsContext.Transport)
+	var ianaNumber string
+	if transport == "" {
+		transport = "udp"
+		ianaNumber = "17"
+	} else if transport == "tcp" {
+		ianaNumber = "6"
+	}
+
+	var ecsServer *ecs.Target
+	if address := dnsContext.ServerAddress; address != "" {
+		ecsServer = &ecs.Target{}
+		if host, port, err := net.SplitHostPort(address); err == nil {
+			ecsServer.Address = host
+			if addressIp := net.ParseIP(host); addressIp != nil {
+				ecsServer.Ip = addressIp.String()
+			} else {
+				ecsServer.Domain = address
+			}
+
+			if port != "" {
+				if portNum, err := strconv.Atoi(port); err == nil {
+					ecsServer.Port = portNum
+				}
+			}
+		}
+	}
+
+	base := &ecs.Base{
+		Network: &ecs.Network{Protocol: "dns", Transport: transport, IanaNumber: ianaNumber},
+		Server:  ecsServer,
+	}
+	EnrichWithDnsMessage(base, message)
+
+	return base
 }
 
 func ExtractDnsContext(ctx context.Context, record *slog.Record) error {
 	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
 		base := ParseDnsContext(dnsContext)
+		if base != nil {
+			baseBytes, err := json.Marshal(base)
+			if err != nil {
+				return motmedelErrors.NewWithTrace(fmt.Errorf("json marshal (ecs base): %w", err), base)
+			}
 
-		baseBytes, err := json.Marshal(base)
-		if err != nil {
-			return motmedelErrors.NewWithTrace(fmt.Errorf("json marshal (ecs base): %w", err), base)
+			var baseMap map[string]any
+			if err = json.Unmarshal(baseBytes, &baseMap); err != nil {
+				return motmedelErrors.NewWithTrace(fmt.Errorf("json unmarshal (ecs base map): %w", err), baseMap)
+			}
+
+			record.Add(motmedelLog.AttrsFromMap(baseMap)...)
 		}
-
-		var baseMap map[string]any
-		if err = json.Unmarshal(baseBytes, &baseMap); err != nil {
-			return motmedelErrors.NewWithTrace(fmt.Errorf("json unmarshal (ecs base map): %w", err), baseMap)
-		}
-
-		record.Add(motmedelLog.AttrsFromMap(baseMap)...)
 	}
 
 	return nil
