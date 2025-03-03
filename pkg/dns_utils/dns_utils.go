@@ -53,7 +53,7 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	}
 
 	in, _, err := client.Exchange(message, serverAddress)
-	dnsContext, ok := ctx.Value(*dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
 	if ok && dnsContext != nil {
 		dnsContext.ServerAddress = serverAddress
 		dnsContext.Transport = client.Net
