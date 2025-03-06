@@ -3,9 +3,9 @@ module github.com/Motmedel/dns_utils/cmd/txt_retriever
 go 1.24.0
 
 require (
-	github.com/Motmedel/dns_utils v0.0.24
+	github.com/Motmedel/dns_utils v0.0.25
 	github.com/Motmedel/dns_utils/pkg/log v0.0.3
-	github.com/Motmedel/utils_go v0.0.148
+	github.com/Motmedel/utils_go v0.0.156
 	golang.org/x/sync v0.11.0
 )
 

@@ -25,15 +25,13 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 		return
 	}
 
+	if message == nil {
+		return
+	}
+
 	var question *dns.Question
 	if questions := message.Question; len(questions) > 0 {
 		question = &questions[0]
-	}
-
-	answers := message.Answer
-
-	if question == nil && len(answers) == 0 {
-		return
 	}
 
 	ecsDns := base.Dns
@@ -62,10 +60,8 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 		}
 	}
 
-	var isAnswer bool
 	var resolvedIps []string
-
-	for _, answer := range answers {
+	for _, answer := range message.Answer {
 		if answer == nil {
 			continue
 		}
@@ -75,7 +71,6 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 			continue
 		}
 
-		isAnswer = true
 		answerType := dns.TypeToString[answerHeader.Rrtype]
 		answerData := dns_utils.GetAnswerString(answer)
 
@@ -97,7 +92,7 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 
 	ecsDns.ResolvedIp = motmedelIter.Set(resolvedIps)
 
-	if isAnswer {
+	if message.Response {
 		ecsDns.ResponseCode = dns.RcodeToString[message.Rcode]
 		ecsDns.Type = "answer"
 	} else {

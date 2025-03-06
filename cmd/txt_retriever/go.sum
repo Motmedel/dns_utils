@@ -1,11 +1,11 @@
-github.com/Motmedel/dns_utils v0.0.24 h1:Zd3eTmALcC7pZsbXsqZXeQgW3xA/WbFQXB3LE1LcNFc=
-github.com/Motmedel/dns_utils v0.0.24/go.mod h1:6AIhQaIZGVhccVevYdsfWZIQ4UcMKXJhIxfK0tg4w3A=
+github.com/Motmedel/dns_utils v0.0.25 h1:ukEBzQFD9h2o5oM4FybVLav1/2eZd6ZTe4Bsg8iqmAw=
+github.com/Motmedel/dns_utils v0.0.25/go.mod h1:6AIhQaIZGVhccVevYdsfWZIQ4UcMKXJhIxfK0tg4w3A=
 github.com/Motmedel/dns_utils/pkg/log v0.0.3 h1:37eXdt8wNVWa/KGMj6M3DFHMrQvdDG3VuZkY4QdLyZM=
 github.com/Motmedel/dns_utils/pkg/log v0.0.3/go.mod h1:Q/fHiEfPGyM3WrbjdmKS9fgPjZVukldzx0qh3zNEG88=
 github.com/Motmedel/ecs_go v0.0.56 h1:0NedqieLxMYv0ZZC3ZXDVpcZWlfgEYtsaPV4kcr/0BU=
 github.com/Motmedel/ecs_go v0.0.56/go.mod h1:/GC2IyaRqkRtRPgADrCWBZ2tb/kkn9/Dw6jE73bRXyU=
-github.com/Motmedel/utils_go v0.0.148 h1:8iFGVnnn1Th6oOFMniZFMCZPxAP4dqx5OLC4splwP9M=
-github.com/Motmedel/utils_go v0.0.148/go.mod h1:kKm8jM7GA8M7ICIImi5etOMixRgQfnStBPjEoCMTgbg=
+github.com/Motmedel/utils_go v0.0.156 h1:1S0ZXk8M1xSMXy9LPmpjWO5r/YCckJmCE8zOGlYeJZY=
+github.com/Motmedel/utils_go v0.0.156/go.mod h1:kKm8jM7GA8M7ICIImi5etOMixRgQfnStBPjEoCMTgbg=
 github.com/Motmedel/utils_go/pkg/net/domain_breakdown v0.0.4 h1:HKnAihmiXayMLJpTLHcZ+CDZwzm/gtHbG0O2z/Ula1I=
 github.com/Motmedel/utils_go/pkg/net/domain_breakdown v0.0.4/go.mod h1:9+oW16JZtqHOcJxe1J6BCZOtFFTi1a60LCESRZBq+Rg=
 github.com/miekg/dns v1.1.63 h1:8M5aAw6OMZfFXTT7K5V0Eu5YiiL8l7nUAkyN6C9YwaY=

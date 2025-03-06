@@ -9,8 +9,10 @@ import (
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsLog "github.com/Motmedel/dns_utils/pkg/log"
 	dnsUtilsClient "github.com/Motmedel/dns_utils/pkg/types/client"
+	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
+	motmedelErrorLogger "github.com/Motmedel/utils_go/pkg/log/error_logger"
 	"golang.org/x/sync/semaphore"
 	"log/slog"
 	"os"
@@ -20,13 +22,13 @@ import (
 )
 
 func main() {
-	logger := motmedelLog.Logger{
+	logger := &motmedelErrorLogger.Logger{
 		Logger: slog.New(
 			&motmedelLog.ContextHandler{
 				Handler: slog.NewJSONHandler(os.Stderr, nil),
 				Extractors: []motmedelLog.ContextExtractor{
 					dnsUtilsLog.DnsContextExtractor,
-					motmedelLog.ErrorContextExtractor,
+					&motmedelLog.ErrorContextExtractor{SkipStackTrace: true},
 				},
 			},
 		),
@@ -114,7 +116,7 @@ func main() {
 			weightedSemaphore.Release(acquireWeight)
 			if err != nil {
 				logger.WarnContext(
-					motmedelErrors.WithErrorContextValue(
+					motmedelContext.WithErrorContextValue(
 						ctx,
 						motmedelErrors.New(
 							fmt.Errorf("get prefixed txt record strings: %w", err),
