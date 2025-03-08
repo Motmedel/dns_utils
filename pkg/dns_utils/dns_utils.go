@@ -3,6 +3,7 @@ package dns_utils
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
@@ -278,6 +279,38 @@ func GetPrefixedTxtRecordStrings(
 	}
 
 	return prefixedAnswerStrings, nil
+}
+
+func DomainExists(ctx context.Context, domain string, client *dns.Client, serverAddress string) (bool, error) {
+	if domain == "" {
+		return false, nil
+	}
+
+	if client == nil {
+		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+	}
+
+	if serverAddress == "" {
+		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+	}
+
+	// NOTE: The question type should not matter?
+	questionType := dns.TypeSOA
+	_, err := GetDnsAnswers(ctx, domain, questionType, client, serverAddress)
+	if err != nil {
+		var rcodeError *dnsUtilsErrors.RcodeError
+		if errors.As(err, &rcodeError) {
+			if rcodeError.Rcode == dns.RcodeNameError {
+				return false, nil
+			}
+		}
+		return false, motmedelErrors.New(
+			fmt.Errorf("get dns answers: %w", err),
+			domain, questionType, client, serverAddress,
+		)
+	}
+
+	return true, nil
 }
 
 func GetActiveRecords(

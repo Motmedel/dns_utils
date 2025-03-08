@@ -31,6 +31,10 @@ func (client *Client) GetPrefixedTxtRecordStrings(ctx context.Context, domain st
 	return dns_utils.GetPrefixedTxtRecordStrings(ctx, domain, prefix, client.Client, client.Address)
 }
 
+func (client *Client) DomainExists(ctx context.Context, domain string) (bool, error) {
+	return dns_utils.DomainExists(ctx, domain, client.Client, client.Address)
+}
+
 func (client *Client) GetActiveRecords(domain string) (*dnsUtilsTypes.ActiveResult, error) {
 	return dns_utils.GetActiveRecords(domain, client.Client, client.Address)
 }
