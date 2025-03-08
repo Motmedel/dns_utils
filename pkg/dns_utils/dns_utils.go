@@ -111,10 +111,6 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	}
 
 	if in.Rcode != dns.RcodeSuccess {
-		if in.Rcode == dns.RcodeNameError {
-			return nil, nil
-		}
-
 		return nil, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: in.Rcode})
 	}
 
@@ -140,10 +136,6 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		}
 
 		if in.Rcode != dns.RcodeSuccess {
-			if in.Rcode == dns.RcodeNameError {
-				return nil, nil
-			}
-
 			return nil, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: in.Rcode})
 		}
 	}
