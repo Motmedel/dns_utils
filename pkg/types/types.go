@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/miekg/dns"
+	"time"
 )
 
 type ActiveResult struct {
@@ -16,4 +17,5 @@ type DnsContext struct {
 	AnswerMessage   *dns.Msg
 	ServerAddress   string
 	Transport       string
+	Time            *time.Time
 }

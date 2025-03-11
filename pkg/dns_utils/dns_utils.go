@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 const resolvePath = "/etc/resolv.conf"
@@ -95,6 +96,9 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	in, _, err := client.Exchange(message, serverAddress)
 	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
 	if ok && dnsContext != nil {
+		// TODO: Maybe I can obtain an earlier time?
+		t := time.Now()
+		dnsContext.Time = &t
 		dnsContext.ServerAddress = serverAddress
 		dnsContext.Transport = client.Net
 		dnsContext.QuestionMessage = message
@@ -120,6 +124,8 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		tcpDnsClient.Net = "tcp"
 		in, _, err = tcpDnsClient.Exchange(message, serverAddress)
 		if dnsContext != nil {
+			t := time.Now()
+			dnsContext.Time = &t
 			dnsContext.ServerAddress = serverAddress
 			dnsContext.Transport = tcpDnsClient.Net
 			dnsContext.QuestionMessage = message
