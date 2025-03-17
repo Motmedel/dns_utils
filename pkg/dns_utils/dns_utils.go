@@ -10,10 +10,8 @@ import (
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/miekg/dns"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -319,114 +317,45 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 	return true, nil
 }
 
-func GetActiveRecords(
-	domain string,
-	client *dns.Client,
-	serverAddress string,
-) (*dnsUtilsTypes.ActiveResult, error) {
+func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serverAddress string) (bool, error) {
 	if domain == "" {
-		return nil, nil
+		return false, nil
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
-	var cnames []string
-	var addressRecords []string
-	var addressRecordsMutex sync.Mutex
+	message := new(dns.Msg)
+	message.SetQuestion(dns.Fqdn(domain), dns.TypeDNSKEY)
 
-	var once sync.Once
+	opt := &dns.OPT{
+		Hdr:    dns.RR_Header{Name: ".", Rrtype: dns.TypeOPT, Class: 4096},
+		Option: []dns.EDNS0{&dns.EDNS0_COOKIE{}},
+	}
+	opt.SetDo()
 
-	errGroup, _ := errgroup.WithContext(context.Background())
+	message.Extra = append(message.Extra, opt)
 
-	errGroup.Go(func() error {
-		aAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeA, client, serverAddress)
-		if err != nil {
-			return motmedelErrors.New(
-				fmt.Errorf("get dns answers (a): %w", err),
-				domain, client, serverAddress,
-			)
-		}
-
-		var aCnames []string
-		for _, answer := range aAnswers {
-			switch typedAnswer := answer.(type) {
-			case *dns.A:
-				addressRecordsMutex.Lock()
-				addressRecords = append(addressRecords, typedAnswer.A.String())
-				addressRecordsMutex.Unlock()
-			case *dns.CNAME:
-				aCnames = append(aCnames, typedAnswer.Target)
-			}
-		}
-
-		once.Do(func() {
-			cnames = aCnames
-		})
-
-		return nil
-	})
-
-	errGroup.Go(func() error {
-		aaaaAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeAAAA, client, serverAddress)
-		if err != nil {
-			return motmedelErrors.New(
-				fmt.Errorf("get dns answers (aaaa): %w", err),
-				domain, client, serverAddress,
-			)
-		}
-
-		var aaaaCnames []string
-		for _, answer := range aaaaAnswers {
-			switch typedAnswer := answer.(type) {
-			case *dns.AAAA:
-				addressRecordsMutex.Lock()
-				addressRecords = append(addressRecords, typedAnswer.AAAA.String())
-				addressRecordsMutex.Unlock()
-			case *dns.CNAME:
-				aaaaCnames = append(aaaaCnames, typedAnswer.Target)
-			}
-		}
-
-		once.Do(func() {
-			cnames = aaaaCnames
-		})
-
-		return nil
-	})
-
-	var mxHosts []string
-
-	errGroup.Go(
-		func() error {
-			var err error
-			mxAnswers, err := GetDnsAnswers(context.Background(), domain, dns.TypeMX, client, serverAddress)
-			if err != nil {
-				return motmedelErrors.New(
-					fmt.Errorf("get dns answers (mx): %w", err),
-					domain, client, serverAddress,
-				)
-			}
-
-			for _, answer := range mxAnswers {
-				switch typedAnswer := answer.(type) {
-				case *dns.MX:
-					mxHosts = append(mxHosts, typedAnswer.Mx)
-				}
-			}
-
-			return nil
-		},
-	)
-
-	if err := errGroup.Wait(); err != nil {
-		return nil, fmt.Errorf("errgroup wait: %w", err)
+	answers, err := GetDnsAnswersWithMessage(ctx, message, client, serverAddress)
+	if err != nil {
+		return false, motmedelErrors.New(
+			fmt.Errorf("get dns answers with message: %w", err),
+			message,
+		)
 	}
 
-	return &dnsUtilsTypes.ActiveResult{Domain: domain, Cnames: cnames, Addresses: addressRecords, MxHosts: mxHosts}, nil
+	dnssecSupported := false
+	for _, answer := range answers {
+		if _, ok := answer.(*dns.DNSKEY); ok {
+			dnssecSupported = true
+			break
+		}
+	}
+
+	return dnssecSupported, nil
 }

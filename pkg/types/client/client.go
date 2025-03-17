@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
-	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
@@ -35,8 +34,8 @@ func (client *Client) DomainExists(ctx context.Context, domain string) (bool, er
 	return dns_utils.DomainExists(ctx, domain, client.Client, client.Address)
 }
 
-func (client *Client) GetActiveRecords(domain string) (*dnsUtilsTypes.ActiveResult, error) {
-	return dns_utils.GetActiveRecords(domain, client.Client, client.Address)
+func (client *Client) SupportsDnssec(ctx context.Context, domain string) (bool, error) {
+	return dns_utils.SupportsDnssec(ctx, domain, client.Client, client.Address)
 }
 
 func NewWithAddress(address string) (*Client, error) {

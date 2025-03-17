@@ -16,7 +16,6 @@ import (
 	"golang.org/x/sync/semaphore"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -25,7 +24,7 @@ func main() {
 	logger := &motmedelErrorLogger.Logger{
 		Logger: slog.New(
 			&motmedelLog.ContextHandler{
-				Handler: slog.NewJSONHandler(os.Stderr, nil),
+				Next: slog.NewJSONHandler(os.Stderr, nil),
 				Extractors: []motmedelLog.ContextExtractor{
 					dnsUtilsLog.DnsContextExtractor,
 					&motmedelLog.ErrorContextExtractor{SkipStackTrace: true},
@@ -43,9 +42,6 @@ func main() {
 
 	var dnsServerAddress string
 	flag.StringVar(&dnsServerAddress, "dns-server", "", "The DNS server to use.")
-
-	var prefix string
-	flag.StringVar(&prefix, "prefix", "", "The TXT prefix.")
 
 	flag.Parse()
 
@@ -113,29 +109,23 @@ func main() {
 			defer waitGroup.Done()
 
 			ctx := dnsUtilsContext.WithDnsContext(context.Background())
-			rawRecordStrings, err := dnsClient.GetPrefixedTxtRecordStrings(ctx, domain, prefix)
+			ok, err := dnsClient.SupportsDnssec(ctx, domain)
 			weightedSemaphore.Release(acquireWeight)
 			if err != nil {
 				logger.WarnContext(
 					motmedelContext.WithErrorContextValue(
 						ctx,
 						motmedelErrors.New(
-							fmt.Errorf("get prefixed txt record strings: %w", err),
-							domain, dnsServerAddress,
+							fmt.Errorf("supports dnssec: %w", err),
+							domain,
 						),
 					),
-					"An error occurred when retrieving TXT records.",
+					"An error occurred when checking DNSSEC support. Skipping.",
 				)
 				return
 			}
-
-			quotedRecordStrings := make([]string, len(rawRecordStrings))
-			for i, s := range rawRecordStrings {
-				quotedRecordStrings[i] = strconv.Quote(s)
-			}
-
 			printLock.Lock()
-			fmt.Printf("%s:%s\n", domain, strings.Join(quotedRecordStrings, ","))
+			fmt.Printf("%s:%t\n", domain, ok)
 			printLock.Unlock()
 		}()
 	}
@@ -148,4 +138,5 @@ func main() {
 			fmt.Errorf("scanner: %w", err),
 		)
 	}
+
 }
