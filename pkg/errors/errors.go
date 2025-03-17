@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"github.com/miekg/dns"
 )
 
 var (
@@ -23,7 +24,14 @@ func (rcodeError *RcodeError) Is(target error) bool {
 }
 
 func (rcodeError *RcodeError) Error() string {
-	return fmt.Sprintf("%s: %d", ErrUnsuccessfulRcode, rcodeError.Rcode)
+	rcode := rcodeError.Rcode
+
+	msg := fmt.Sprintf("%s: %d", ErrUnsuccessfulRcode, rcode)
+	if rcodeString, ok := dns.RcodeToString[rcode]; ok && rcodeString != "" {
+		msg += fmt.Sprintf(" (%s)", rcodeString)
+	}
+
+	return msg
 }
 
 type MultipleRecordsError struct {
