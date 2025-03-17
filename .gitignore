@@ -24,3 +24,4 @@ go.work
 *.iml
 
 /cmd/txt_retriever/txt_retriever
+/cmd/dnssec_support/dnssec_support

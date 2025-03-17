@@ -133,10 +133,6 @@ func main() {
 	waitGroup.Wait()
 
 	if err := scanner.Err(); err != nil {
-		logger.FatalWithExitingMessage(
-			"An error occurred when scanning.",
-			fmt.Errorf("scanner: %w", err),
-		)
+		logger.FatalWithExitingMessage("An error occurred when scanning.", fmt.Errorf("scanner: %w", err))
 	}
-
 }
