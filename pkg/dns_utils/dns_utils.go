@@ -103,11 +103,7 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		dnsContext.AnswerMessage = in
 	}
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(
-			fmt.Errorf("dns client exchange: %w", err),
-			message,
-			serverAddress,
-		)
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
 	}
 	if in == nil {
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilExchangeMessage)
@@ -227,13 +223,7 @@ func GetDnsAnswerStrings(
 
 	answers, err := GetDnsAnswers(ctx, domain, recordType, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, motmedelErrors.New(
-			fmt.Errorf("get dns answers: %w", err),
-			domain,
-			recordType,
-			dnsClient,
-			dnsServerAddress,
-		)
+		return nil, fmt.Errorf("get dns answers: %w", err)
 	}
 
 	var answerStrings []string
@@ -268,10 +258,7 @@ func GetPrefixedTxtRecordStrings(
 
 	answerStrings, err := GetDnsAnswerStrings(ctx, domain, dns.TypeTXT, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, motmedelErrors.New(
-			fmt.Errorf("get dns answer strings: %w", err),
-			domain, dnsClient, dnsServerAddress,
-		)
+		return nil, fmt.Errorf("get dns answer strings: %w", err)
 	}
 
 	var prefixedAnswerStrings []string
@@ -299,8 +286,7 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 	}
 
 	// NOTE: The question type should not matter?
-	questionType := dns.TypeSOA
-	_, err := GetDnsAnswers(ctx, domain, questionType, client, serverAddress)
+	_, err := GetDnsAnswers(ctx, domain, dns.TypeSOA, client, serverAddress)
 	if err != nil {
 		var rcodeError *dnsUtilsErrors.RcodeError
 		if errors.As(err, &rcodeError) {
@@ -308,10 +294,7 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 				return false, nil
 			}
 		}
-		return false, motmedelErrors.New(
-			fmt.Errorf("get dns answers: %w", err),
-			domain, questionType, client, serverAddress,
-		)
+		return false, fmt.Errorf("get dns answers: %w", err)
 	}
 
 	return true, nil
@@ -343,10 +326,7 @@ func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serv
 
 	answers, err := GetDnsAnswersWithMessage(ctx, message, client, serverAddress)
 	if err != nil {
-		return false, motmedelErrors.New(
-			fmt.Errorf("get dns answers with message: %w", err),
-			message,
-		)
+		return false, motmedelErrors.New(fmt.Errorf("get dns answers with message: %w", err), message)
 	}
 
 	dnssecSupported := false
