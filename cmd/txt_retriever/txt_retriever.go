@@ -25,7 +25,7 @@ func main() {
 	logger := &motmedelErrorLogger.Logger{
 		Logger: slog.New(
 			&motmedelLog.ContextHandler{
-				Handler: slog.NewJSONHandler(os.Stderr, nil),
+				Next: slog.NewJSONHandler(os.Stderr, nil),
 				Extractors: []motmedelLog.ContextExtractor{
 					dnsUtilsLog.DnsContextExtractor,
 					&motmedelLog.ErrorContextExtractor{SkipStackTrace: true},
