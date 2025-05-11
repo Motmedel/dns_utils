@@ -91,12 +91,23 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
-	responseMessage, _, err := client.Exchange(message, serverAddress)
+	connection, err := client.Dial(serverAddress)
+	if err != nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("client dial: %w", err))
+	}
+
+	var clientAddress string
+	if localAddr := connection.LocalAddr(); localAddr != nil {
+		clientAddress = localAddr.String()
+	}
+
+	responseMessage, _, err := client.ExchangeWithConn(message, connection)
 	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
 	if ok && dnsContext != nil {
 		// TODO: Maybe I can obtain an earlier time?
 		t := time.Now()
 		dnsContext.Time = &t
+		dnsContext.ClientAddress = clientAddress
 		dnsContext.ServerAddress = serverAddress
 		dnsContext.Transport = strings.TrimSuffix(strings.ToLower(client.Net), "-tls")
 		dnsContext.QuestionMessage = message
