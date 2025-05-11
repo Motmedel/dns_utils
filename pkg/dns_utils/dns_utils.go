@@ -95,6 +95,7 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 	if err != nil {
 		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("client dial: %w", err))
 	}
+	defer connection.Close()
 
 	var clientAddress string
 	if localAddr := connection.LocalAddr(); localAddr != nil {
