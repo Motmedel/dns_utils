@@ -7,12 +7,12 @@ import (
 )
 
 var (
-	ErrNilDnsClient       = errors.New("nil dns client")
-	ErrUnsetRecordType    = errors.New("unset record type")
-	ErrUnsuccessfulRcode  = errors.New("unsuccessful rcode")
-	ErrEmptyDnsServer     = errors.New("empty dns server")
-	ErrNilExchangeMessage = errors.New("nil exchange message")
-	ErrMultipleRecords    = errors.New("multiple records")
+	ErrNilDnsClient      = errors.New("nil dns client")
+	ErrUnsetRecordType   = errors.New("unset record type")
+	ErrUnsuccessfulRcode = errors.New("unsuccessful rcode")
+	ErrEmptyDnsServer    = errors.New("empty dns server")
+	ErrNilMessage        = errors.New("nil message")
+	ErrMultipleRecords   = errors.New("multiple records")
 )
 
 type RcodeError struct {

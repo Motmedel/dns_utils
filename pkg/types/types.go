@@ -15,6 +15,7 @@ type ActiveResult struct {
 type DnsContext struct {
 	QuestionMessage *dns.Msg
 	AnswerMessage   *dns.Msg
+	ClientAddress   string
 	ServerAddress   string
 	Transport       string
 	Time            *time.Time

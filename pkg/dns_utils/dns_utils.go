@@ -78,6 +78,44 @@ func GetDnsServers() ([]string, error) {
 	return dnsServers, nil
 }
 
+func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverAddress string) (*dns.Msg, error) {
+	if message == nil {
+		return nil, nil
+	}
+
+	if client == nil {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+	}
+
+	if serverAddress == "" {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+	}
+
+	responseMessage, _, err := client.Exchange(message, serverAddress)
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if ok && dnsContext != nil {
+		// TODO: Maybe I can obtain an earlier time?
+		t := time.Now()
+		dnsContext.Time = &t
+		dnsContext.ServerAddress = serverAddress
+		dnsContext.Transport = client.Net
+		dnsContext.QuestionMessage = message
+		dnsContext.AnswerMessage = responseMessage
+	}
+	if err != nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
+	}
+	if responseMessage == nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
+	}
+
+	if responseMessage.Rcode != dns.RcodeSuccess {
+		return responseMessage, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: responseMessage.Rcode})
+	}
+
+	return responseMessage, nil
+}
+
 func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns.Client, serverAddress string) ([]dns.RR, error) {
 	if message == nil {
 		return nil, nil
@@ -91,57 +129,29 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
 
-	in, _, err := client.Exchange(message, serverAddress)
-	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
-	if ok && dnsContext != nil {
-		// TODO: Maybe I can obtain an earlier time?
-		t := time.Now()
-		dnsContext.Time = &t
-		dnsContext.ServerAddress = serverAddress
-		dnsContext.Transport = client.Net
-		dnsContext.QuestionMessage = message
-		dnsContext.AnswerMessage = in
-	}
+	responseMessage, err := Exchange(ctx, message, client, serverAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
+		return nil, fmt.Errorf("exchange: %w", err)
 	}
-	if in == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilExchangeMessage)
-	}
-
-	if in.Rcode != dns.RcodeSuccess {
-		return nil, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: in.Rcode})
+	if responseMessage == nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
 	}
 
-	if in.MsgHdr.Truncated {
+	if responseMessage.Truncated {
 		tcpDnsClient := *client
 		tcpDnsClient.Net = "tcp"
-		in, _, err = tcpDnsClient.Exchange(message, serverAddress)
-		if dnsContext != nil {
-			t := time.Now()
-			dnsContext.Time = &t
-			dnsContext.ServerAddress = serverAddress
-			dnsContext.Transport = tcpDnsClient.Net
-			dnsContext.QuestionMessage = message
-			dnsContext.AnswerMessage = in
-		}
-		if err != nil {
-			return nil, motmedelErrors.NewWithTrace(
-				fmt.Errorf("dns client exchange (tcp): %w", err),
-				message,
-				serverAddress,
-			)
-		}
-		if in == nil {
-			return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilExchangeMessage)
-		}
 
-		if in.Rcode != dns.RcodeSuccess {
-			return nil, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: in.Rcode})
+		responseMessage, err = Exchange(ctx, message, &tcpDnsClient, serverAddress)
+		if err != nil {
+			return nil, motmedelErrors.New(fmt.Errorf("exchange: %w", err), tcpDnsClient)
 		}
 	}
 
-	return in.Answer, nil
+	if responseMessage == nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
+	}
+
+	return responseMessage.Answer, nil
 }
 
 func GetDnsAnswers(
