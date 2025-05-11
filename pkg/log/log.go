@@ -155,8 +155,28 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 		}
 	}
 
+	var ecsClient *ecs.Target
+	if address := dnsContext.ClientAddress; address != "" {
+		ecsClient = &ecs.Target{}
+		if host, port, err := net.SplitHostPort(address); err == nil {
+			ecsClient.Address = host
+			if addressIp := net.ParseIP(host); addressIp != nil {
+				ecsClient.Ip = addressIp.String()
+			} else {
+				ecsClient.Domain = address
+			}
+
+			if port != "" {
+				if portNum, err := strconv.Atoi(port); err == nil {
+					ecsClient.Port = portNum
+				}
+			}
+		}
+	}
+
 	base := &ecs.Base{
 		Network: &ecs.Network{Protocol: "dns", Transport: transport, IanaNumber: ianaNumber},
+		Client:  ecsClient,
 		Server:  ecsServer,
 	}
 	EnrichWithDnsMessage(base, message)
