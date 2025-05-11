@@ -98,7 +98,7 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		t := time.Now()
 		dnsContext.Time = &t
 		dnsContext.ServerAddress = serverAddress
-		dnsContext.Transport = client.Net
+		dnsContext.Transport = strings.TrimSuffix(strings.ToLower(client.Net), "-tls")
 		dnsContext.QuestionMessage = message
 		dnsContext.AnswerMessage = responseMessage
 	}
