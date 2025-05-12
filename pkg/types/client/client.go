@@ -42,7 +42,11 @@ func NewWithAddress(address string) (*Client, error) {
 	if address == "" {
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
 	}
-	return &Client{Client: new(dns.Client), Address: address}, nil
+
+	var client dns.Client
+	client.UDPSize = 4096
+
+	return &Client{Client: &client, Address: address}, nil
 }
 
 func New() (*Client, error) {

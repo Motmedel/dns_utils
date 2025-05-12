@@ -192,6 +192,12 @@ func GetDnsAnswers(
 	message := &dns.Msg{}
 	message.SetQuestion(dns.Fqdn(domain), recordType)
 
+	if client.Net == "" || client.Net == "udp" {
+		if bufferSize := client.UDPSize; bufferSize > 0 {
+			message.SetEdns0(bufferSize, false)
+		}
+	}
+
 	return GetDnsAnswersWithMessage(ctx, message, client, serverAddress)
 }
 
