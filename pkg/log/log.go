@@ -128,12 +128,12 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 	}
 
 	transport := strings.ToLower(dnsContext.Transport)
-	var ianaNumber string
+	var ianaNumber int
 	if transport == "" {
 		transport = "udp"
-		ianaNumber = "17"
+		ianaNumber = 17
 	} else if transport == "tcp" {
-		ianaNumber = "6"
+		ianaNumber = 6
 	}
 
 	var ecsServer *ecs.Target
@@ -174,12 +174,23 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 		}
 	}
 
+	var communityIdSlice []string
+	if communityId := ecs.CommunityIdFromTargets(ecsClient, ecsServer, ianaNumber); communityId != "" {
+		communityIdSlice = []string{communityId}
+	}
+
 	base := &ecs.Base{
-		Network: &ecs.Network{Protocol: "dns", Transport: transport, IanaNumber: ianaNumber},
-		Client:  ecsClient,
-		Server:  ecsServer,
+		Network: &ecs.Network{
+			CommunityId: communityIdSlice,
+			Protocol:    "dns",
+			Transport:   transport,
+			IanaNumber:  strconv.Itoa(ianaNumber),
+		},
+		Client: ecsClient,
+		Server: ecsServer,
 	}
 	EnrichWithDnsMessage(base, message)
+	ecs.EnrichWithTlsContext(base, dnsContext.TlsContext)
 
 	return base
 }

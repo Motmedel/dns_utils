@@ -10,7 +10,6 @@ import (
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	motmedelTlsContext "github.com/Motmedel/utils_go/pkg/tls/context"
 	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
 	"os"
@@ -181,13 +180,13 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		dnsContext.Transport = strings.TrimSuffix(strings.ToLower(client.Net), "-tls")
 		dnsContext.QuestionMessage = message
 		dnsContext.AnswerMessage = responseMessage
-	}
 
-	if tlsConn, ok := connection.Conn.(*tls.Conn); ok && tlsConn != nil {
-		if tlsContext, ok := ctx.Value(motmedelTlsContext.TlsContextKey).(*motmedelTlsTypes.TlsContext); ok && tlsContext != nil {
+		if tlsConn, ok := connection.Conn.(*tls.Conn); ok && tlsConn != nil {
 			connectionState := tlsConn.ConnectionState()
-			tlsContext.ConnectionState = &connectionState
-			tlsContext.ClientSide = true
+			dnsContext.TlsContext = &motmedelTlsTypes.TlsContext{
+				ConnectionState: &connectionState,
+				ClientInitiated: true,
+			}
 		}
 	}
 

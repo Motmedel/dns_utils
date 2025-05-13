@@ -3,9 +3,9 @@ module github.com/Motmedel/dns_utils/pkg/log
 go 1.24.0
 
 require (
-	github.com/Motmedel/dns_utils v0.0.32
-	github.com/Motmedel/ecs_go v0.0.56
-	github.com/Motmedel/utils_go v0.0.198
+	github.com/Motmedel/dns_utils v0.0.38
+	github.com/Motmedel/ecs_go v0.0.62
+	github.com/Motmedel/utils_go v0.0.202
 	github.com/Motmedel/utils_go/pkg/net/domain_breakdown v0.0.4
 	github.com/miekg/dns v1.1.66
 )
