@@ -295,6 +295,8 @@ func GetAnswerString(answer dns.RR) string {
 		return strings.Join(typedAnswer.Txt, "")
 	case *dns.CNAME:
 		return typedAnswer.Target
+	case *dns.HTTPS:
+		return strings.TrimPrefix(typedAnswer.String(), typedAnswer.Hdr.String())
 	}
 
 	// TODO: There could be more types...
