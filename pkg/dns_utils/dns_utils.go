@@ -3,12 +3,15 @@ package dns_utils
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	motmedelTlsContext "github.com/Motmedel/utils_go/pkg/tls/context"
+	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
 	"os"
 	"strings"
@@ -168,8 +171,8 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 	}
 
 	responseMessage, _, err := client.ExchangeWithConn(message, connection)
-	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
-	if ok && dnsContext != nil {
+
+	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
 		// TODO: Maybe I can obtain an earlier time?
 		t := time.Now()
 		dnsContext.Time = &t
@@ -179,6 +182,15 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		dnsContext.QuestionMessage = message
 		dnsContext.AnswerMessage = responseMessage
 	}
+
+	if tlsConn, ok := connection.Conn.(*tls.Conn); ok {
+		if tlsContext, ok := ctx.Value(motmedelTlsContext.TlsContextKey).(*motmedelTlsTypes.TlsContext); ok && tlsContext != nil {
+			connectionState := tlsConn.ConnectionState()
+			tlsContext.ConnectionState = &connectionState
+			tlsContext.ClientSide = true
+		}
+	}
+
 	if err != nil {
 		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
 	}
