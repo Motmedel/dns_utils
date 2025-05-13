@@ -78,6 +78,71 @@ func GetDnsServers() ([]string, error) {
 	return dnsServers, nil
 }
 
+// ApplyRemainingTtl rewrites every RR TTL to the remaining seconds.
+func ApplyRemainingTtl(message *dns.Msg, seconds uint32) {
+	if message == nil {
+		return
+	}
+
+	update := func(records []dns.RR) {
+		for _, record := range records {
+			if record == nil {
+				continue
+			}
+
+			if header := record.Header(); header != nil {
+				header.Ttl = seconds
+			}
+		}
+	}
+
+	update(message.Answer)
+	update(message.Ns)
+	update(message.Extra)
+}
+
+func EffectiveMessageTtl(message *dns.Msg) time.Duration {
+	if message == nil {
+		return 0
+	}
+
+	minValue := ^uint32(0)
+	sweep := func(records []dns.RR) {
+		for _, record := range records {
+			if record == nil {
+				continue
+			}
+
+			switch record.(type) {
+			case *dns.OPT, *dns.TSIG, *dns.SIG:
+				continue
+			default:
+				if header := record.Header(); header != nil {
+					ttl := header.Ttl
+					if ttl < minValue {
+						minValue = ttl
+					}
+				}
+			}
+		}
+	}
+
+	sweep(message.Answer)
+	sweep(message.Ns)
+	sweep(message.Extra)
+
+	// NXDOMAIN / NODATA – use SOA.MINIMUM if smaller
+	if message.Rcode == dns.RcodeNameError || len(message.Answer) == 0 {
+		for _, record := range message.Ns {
+			if soa, ok := record.(*dns.SOA); ok && soa.Minttl < minValue {
+				minValue = soa.Minttl
+			}
+		}
+	}
+
+	return time.Duration(minValue) * time.Second
+}
+
 func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverAddress string) (*dns.Msg, error) {
 	if message == nil {
 		return nil, nil
