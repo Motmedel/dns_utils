@@ -129,11 +129,12 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 
 	transport := strings.ToLower(dnsContext.Transport)
 	var ianaNumber int
-	if transport == "" {
+	switch transport {
+	case "tcp":
+		ianaNumber = 6
+	case "udp", "":
 		transport = "udp"
 		ianaNumber = 17
-	} else if transport == "tcp" {
-		ianaNumber = 6
 	}
 
 	var ecsServer *ecs.Target
