@@ -183,7 +183,7 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		dnsContext.AnswerMessage = responseMessage
 	}
 
-	if tlsConn, ok := connection.Conn.(*tls.Conn); ok {
+	if tlsConn, ok := connection.Conn.(*tls.Conn); ok && tlsConn != nil {
 		if tlsContext, ok := ctx.Value(motmedelTlsContext.TlsContextKey).(*motmedelTlsTypes.TlsContext); ok && tlsContext != nil {
 			connectionState := tlsConn.ConnectionState()
 			tlsContext.ConnectionState = &connectionState
