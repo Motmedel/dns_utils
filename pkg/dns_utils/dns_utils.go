@@ -172,12 +172,17 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 	responseMessage, _, err := client.ExchangeWithConn(message, connection)
 
 	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
+		transport := strings.TrimSuffix(strings.ToLower(client.Net), "-tls")
+		if transport == "" {
+			transport = "udp"
+		}
+
 		// TODO: Maybe I can obtain an earlier time?
 		t := time.Now()
 		dnsContext.Time = &t
 		dnsContext.ClientAddress = clientAddress
 		dnsContext.ServerAddress = serverAddress
-		dnsContext.Transport = strings.TrimSuffix(strings.ToLower(client.Net), "-tls")
+		dnsContext.Transport = transport
 		dnsContext.QuestionMessage = message
 		dnsContext.AnswerMessage = responseMessage
 
