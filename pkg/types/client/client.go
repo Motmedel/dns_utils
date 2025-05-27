@@ -14,6 +14,10 @@ type Client struct {
 	Address string
 }
 
+func (client *Client) Exchange(ctx context.Context, message *dns.Msg) (*dns.Msg, error) {
+	return dns_utils.Exchange(ctx, message, client.Client, client.Address)
+}
+
 func (client *Client) GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg) ([]dns.RR, error) {
 	return dns_utils.GetDnsAnswersWithMessage(ctx, message, client.Client, client.Address)
 }

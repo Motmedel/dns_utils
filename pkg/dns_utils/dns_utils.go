@@ -9,9 +9,11 @@ import (
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
+	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -145,7 +147,7 @@ func EffectiveMessageTtl(message *dns.Msg) time.Duration {
 	return time.Duration(minValue) * time.Second
 }
 
-func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverAddress string) (*dns.Msg, error) {
+func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client, connection *dns.Conn) (*dns.Msg, error) {
 	if message == nil {
 		return nil, nil
 	}
@@ -154,27 +156,23 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
 	}
 
-	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
-	}
-
-	connection, err := client.Dial(serverAddress)
-	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("client dial: %w", err))
-	}
-	defer connection.Close()
-
-	var clientAddress string
-	if localAddr := connection.LocalAddr(); localAddr != nil {
-		clientAddress = localAddr.String()
+	if connection == nil {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilConnection)
 	}
 
 	responseMessage, _, err := client.ExchangeWithConn(message, connection)
 
 	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
-		transport := strings.TrimSuffix(strings.ToLower(client.Net), "-tls")
-		if transport == "" {
-			transport = "udp"
+		var clientAddress string
+		if localAddr := connection.LocalAddr(); localAddr != nil {
+			clientAddress = localAddr.String()
+		}
+
+		var serverAddress string
+		var transport string
+		if remoteAddr := connection.RemoteAddr(); remoteAddr != nil {
+			serverAddress = remoteAddr.String()
+			transport = remoteAddr.Network()
 		}
 
 		// TODO: Maybe I can obtain an earlier time?
@@ -204,6 +202,46 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 
 	if responseMessage.Rcode != dns.RcodeSuccess {
 		return responseMessage, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: responseMessage.Rcode})
+	}
+
+	return responseMessage, nil
+}
+
+func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverAddress string) (*dns.Msg, error) {
+	if message == nil {
+		return nil, nil
+	}
+
+	if client == nil {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+	}
+
+	if serverAddress == "" {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+	}
+
+	connection, err := client.Dial(serverAddress)
+	if err != nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("client dial: %w", err))
+	}
+	if connection == nil {
+		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilConnection)
+	}
+	defer func() {
+		if err := connection.Close(); err != nil {
+			slog.WarnContext(
+				motmedelContext.WithErrorContextValue(ctx, err),
+				"An error occurred when closing the connection.",
+			)
+		}
+	}()
+
+	responseMessage, err := ExchangeWithConn(ctx, message, client, connection)
+	if err != nil {
+		return nil, motmedelErrors.New(fmt.Errorf("exchange with conn: %w", err), connection)
+	}
+	if responseMessage == nil {
+		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
 	}
 
 	return responseMessage, nil

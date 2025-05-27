@@ -13,6 +13,7 @@ var (
 	ErrEmptyDnsServer    = errors.New("empty dns server")
 	ErrNilMessage        = errors.New("nil message")
 	ErrMultipleRecords   = errors.New("multiple records")
+	ErrNilConnection     = errors.New("nil connection")
 )
 
 type RcodeError struct {
