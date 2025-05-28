@@ -194,7 +194,7 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	}
 
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
+		return responseMessage, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
 	}
 	if responseMessage == nil {
 		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
