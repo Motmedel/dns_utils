@@ -139,5 +139,9 @@ func Exchange(
 		dnsContext.AnswerMessage = &response
 	}
 
+	if response.Rcode != dns.RcodeSuccess {
+		return &response, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: response.Rcode})
+	}
+
 	return &response, nil
 }
