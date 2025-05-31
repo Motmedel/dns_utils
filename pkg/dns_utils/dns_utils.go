@@ -60,12 +60,22 @@ func GetFlagsFromMessage(message *dns.Msg) []string {
 	return flags
 }
 
-func GetDnsServers() ([]string, error) {
+func GetDnsServers(ctx context.Context) ([]string, error) {
 	file, err := os.Open(resolvePath)
 	if err != nil {
 		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("os open: %w", err), resolvePath)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.WarnContext(
+				motmedelContext.WithErrorContextValue(
+					ctx,
+					motmedelErrors.NewWithTrace(fmt.Errorf("file close: %w", err), file),
+				),
+				"An error occurred when closing the file.",
+			)
+		}
+	}()
 
 	var dnsServers []string
 	scanner := bufio.NewScanner(file)
