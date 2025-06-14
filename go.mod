@@ -3,7 +3,7 @@ module github.com/Motmedel/dns_utils
 go 1.24.0
 
 require (
-	github.com/Motmedel/utils_go v0.0.205
+	github.com/Motmedel/utils_go v0.0.206
 	github.com/miekg/dns v1.1.66
 )
 

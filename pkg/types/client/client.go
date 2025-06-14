@@ -53,8 +53,8 @@ func NewWithAddress(address string) (*Client, error) {
 	return &Client{Client: &client, Address: address}, nil
 }
 
-func New() (*Client, error) {
-	dnsServerAddresses, err := dns_utils.GetDnsServers()
+func New(ctx context.Context) (*Client, error) {
+	dnsServerAddresses, err := dns_utils.GetDnsServers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get dns servers: %w", err)
 	}
