@@ -2,7 +2,6 @@ package log
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
@@ -10,6 +9,7 @@ import (
 	"github.com/Motmedel/ecs_go/ecs"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	motmedelIter "github.com/Motmedel/utils_go/pkg/iter"
+	motmedelJson "github.com/Motmedel/utils_go/pkg/json"
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
 	motmedelNet "github.com/Motmedel/utils_go/pkg/net"
 	"github.com/Motmedel/utils_go/pkg/net/domain_breakdown"
@@ -198,16 +198,10 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 
 func ExtractDnsContext(ctx context.Context, record *slog.Record) error {
 	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
-		base := ParseDnsContext(dnsContext)
-		if base != nil {
-			baseBytes, err := json.Marshal(base)
+		if base := ParseDnsContext(dnsContext); base != nil {
+			baseMap, err := motmedelJson.ObjectToMap(base)
 			if err != nil {
-				return motmedelErrors.NewWithTrace(fmt.Errorf("json marshal (ecs base): %w", err), base)
-			}
-
-			var baseMap map[string]any
-			if err = json.Unmarshal(baseBytes, &baseMap); err != nil {
-				return motmedelErrors.NewWithTrace(fmt.Errorf("json unmarshal (ecs base map): %w", err), baseMap)
+				return motmedelErrors.NewWithTrace(fmt.Errorf("object to map: %w", err), base)
 			}
 
 			record.Add(motmedelLog.AttrsFromMap(baseMap)...)
