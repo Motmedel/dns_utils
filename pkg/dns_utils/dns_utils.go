@@ -157,6 +157,51 @@ func EffectiveMessageTtl(message *dns.Msg) time.Duration {
 	return time.Duration(minValue) * time.Second
 }
 
+func populateDnsContext(
+	dnsContext *dnsUtilsTypes.DnsContext,
+	connection *dns.Conn,
+	message *dns.Msg,
+	responseMessage *dns.Msg,
+) error {
+	if dnsContext == nil {
+		return nil
+	}
+
+	// TODO: Maybe I can obtain an earlier time?
+	t := time.Now()
+
+	var clientAddress string
+	var serverAddress string
+	var transport string
+	if connection != nil {
+		if localAddr := connection.LocalAddr(); localAddr != nil {
+			clientAddress = localAddr.String()
+		}
+
+		if remoteAddr := connection.RemoteAddr(); remoteAddr != nil {
+			serverAddress = remoteAddr.String()
+			transport = remoteAddr.Network()
+		}
+
+		if tlsConn, ok := connection.Conn.(*tls.Conn); ok && tlsConn != nil {
+			connectionState := tlsConn.ConnectionState()
+			dnsContext.TlsContext = &motmedelTlsTypes.TlsContext{
+				ConnectionState: &connectionState,
+				ClientInitiated: true,
+			}
+		}
+	}
+
+	dnsContext.Time = &t
+	dnsContext.ClientAddress = clientAddress
+	dnsContext.ServerAddress = serverAddress
+	dnsContext.Transport = transport
+	dnsContext.QuestionMessage = message
+	dnsContext.AnswerMessage = responseMessage
+
+	return nil
+}
+
 func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client, connection *dns.Conn) (*dns.Msg, error) {
 	if message == nil {
 		return nil, nil
@@ -170,48 +215,45 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilConnection)
 	}
 
+	// Exchange
+
 	responseMessage, _, err := client.ExchangeWithConn(message, connection)
 
-	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
-		var clientAddress string
-		if localAddr := connection.LocalAddr(); localAddr != nil {
-			clientAddress = localAddr.String()
-		}
+	// Populate the DNS context.
 
-		var serverAddress string
-		var transport string
-		if remoteAddr := connection.RemoteAddr(); remoteAddr != nil {
-			serverAddress = remoteAddr.String()
-			transport = remoteAddr.Network()
-		}
-
-		// TODO: Maybe I can obtain an earlier time?
-		t := time.Now()
-		dnsContext.Time = &t
-		dnsContext.ClientAddress = clientAddress
-		dnsContext.ServerAddress = serverAddress
-		dnsContext.Transport = transport
-		dnsContext.QuestionMessage = message
-		dnsContext.AnswerMessage = responseMessage
-
-		if tlsConn, ok := connection.Conn.(*tls.Conn); ok && tlsConn != nil {
-			connectionState := tlsConn.ConnectionState()
-			dnsContext.TlsContext = &motmedelTlsTypes.TlsContext{
-				ConnectionState: &connectionState,
-				ClientInitiated: true,
-			}
-		}
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
 	}
+	ctxWithDnsContext := context.WithValue(context.Background(), dnsUtilsContext.DnsContextKey, dnsContext)
+
+	if err := populateDnsContext(dnsContext, connection, message, responseMessage); err != nil {
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("populate dns context: %w", err),
+		)
+	}
+
+	// Return
 
 	if err != nil {
-		return responseMessage, motmedelErrors.NewWithTrace(fmt.Errorf("dns client exchange: %w", err))
+		return responseMessage,motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("dns client exchange: %w", err),
+		)
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage),
+		)
 	}
 
 	if responseMessage.Rcode != dns.RcodeSuccess {
-		return responseMessage, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: responseMessage.Rcode})
+		return responseMessage, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			&dnsUtilsErrors.RcodeError{Rcode: responseMessage.Rcode},
+		)
 	}
 
 	return responseMessage, nil
