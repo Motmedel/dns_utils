@@ -25,3 +25,4 @@ go.work
 
 /cmd/txt_retriever/txt_retriever
 /cmd/dnssec_support/dnssec_support
+/cmd/domain_exists/domain_exists

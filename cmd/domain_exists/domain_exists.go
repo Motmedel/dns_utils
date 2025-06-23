@@ -28,7 +28,12 @@ func main() {
 				Next: motmedelLogHandler.New(slog.NewJSONHandler(os.Stderr, nil)),
 				Extractors: []motmedelLog.ContextExtractor{
 					dnsUtilsLog.DnsContextExtractor,
-					&motmedelLog.ErrorContextExtractor{SkipStackTrace: true},
+					&motmedelLog.ErrorContextExtractor{
+						SkipStackTrace: true,
+						ContextExtractors: []motmedelLog.ContextExtractor{
+							dnsUtilsLog.DnsContextExtractor,
+						},
+					},
 				},
 			},
 		),
@@ -110,7 +115,7 @@ func main() {
 			defer waitGroup.Done()
 
 			ctx := dnsUtilsContext.WithDnsContext(context.Background())
-			ok, err := dnsClient.SupportsDnssec(ctx, domain)
+			ok, err := dnsClient.DomainExists(ctx, domain)
 			weightedSemaphore.Release(acquireWeight)
 			if err != nil {
 				logger.WarnContext(
@@ -121,7 +126,7 @@ func main() {
 							domain,
 						),
 					),
-					"An error occurred when checking DNSSEC support. Skipping.",
+					"An error occurred when checking if a domain exists. Skipping.",
 				)
 				return
 			}
