@@ -3,11 +3,19 @@ package client
 import (
 	"context"
 	"fmt"
+
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
+
+const DefaultServerAddress = "8.8.8.8:53"
+
+var DefaultClient = &Client{
+	Client:  &dns.Client{UDPSize: 4096},
+	Address: DefaultServerAddress,
+}
 
 type Client struct {
 	*dns.Client
