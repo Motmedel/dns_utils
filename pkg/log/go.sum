@@ -1,5 +1,5 @@
-github.com/Motmedel/dns_utils v0.0.48 h1:VpiEZ4cvEnK7ZRjFwuz2COTbMMLXZyiRfcuLXhS8tv8=
-github.com/Motmedel/dns_utils v0.0.48/go.mod h1:q3fGO+5mMsqARw4uWm/b2qnsUdxArUg0xDzu6MSvVyI=
+github.com/Motmedel/dns_utils v0.0.49 h1:QOyrniikc9YQyN+ACvnkdofOQ5vq0R04pwnqUReIEjE=
+github.com/Motmedel/dns_utils v0.0.49/go.mod h1:T4XURba1uSRxOUtQLKuGdOVhs1OyCn8HZpU3whcYKV8=
 github.com/Motmedel/ecs_go v0.0.70 h1:Xx1VQGECYfbGX0chf+IcwoaBSaJPM9x1K6dJhvkPjQc=
 github.com/Motmedel/ecs_go v0.0.70/go.mod h1:F8DCLg1lwPCNbFHsY39Y1ZatxDRg7TpHU+pPaXhgLtc=
 github.com/Motmedel/utils_go v0.0.381 h1:oQWa1xyqtbrXTO/KekZTRF18XtnuJQ065+F9CcBpbB8=
