@@ -3,6 +3,11 @@ package log
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net"
+	"strconv"
+	"strings"
+
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
@@ -14,10 +19,6 @@ import (
 	motmedelNet "github.com/Motmedel/utils_go/pkg/net"
 	"github.com/Motmedel/utils_go/pkg/net/domain_breakdown"
 	"github.com/miekg/dns"
-	"log/slog"
-	"net"
-	"strconv"
-	"strings"
 )
 
 func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
