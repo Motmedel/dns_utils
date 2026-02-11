@@ -6,6 +6,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"strings"
+	"time"
+
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
@@ -13,10 +18,6 @@ import (
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
-	"log/slog"
-	"os"
-	"strings"
-	"time"
 )
 
 const resolvePath = "/etc/resolv.conf"
@@ -68,7 +69,7 @@ func GetDnsServers(ctx context.Context) ([]string, error) {
 	defer func() {
 		if err := file.Close(); err != nil {
 			slog.WarnContext(
-				motmedelContext.WithErrorContextValue(
+				motmedelContext.WithError(
 					ctx,
 					motmedelErrors.NewWithTrace(fmt.Errorf("file close: %w", err), file),
 				),
@@ -237,7 +238,7 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	// Return
 
 	if err != nil {
-		return responseMessage,motmedelErrors.NewWithTraceCtx(
+		return responseMessage, motmedelErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("dns client exchange: %w", err),
 		)
@@ -282,7 +283,7 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 	defer func() {
 		if err := connection.Close(); err != nil {
 			slog.WarnContext(
-				motmedelContext.WithErrorContextValue(ctx, err),
+				motmedelContext.WithError(ctx, err),
 				"An error occurred when closing the connection.",
 			)
 		}
