@@ -4,9 +4,8 @@ go 1.25
 
 require (
 	github.com/Motmedel/dns_utils v0.0.49
-	github.com/Motmedel/ecs_go v0.0.70
-	github.com/Motmedel/utils_go v0.0.381
-	github.com/Motmedel/utils_go/pkg/net/domain_breakdown v0.0.5
+	github.com/Motmedel/ecs_go v0.0.71
+	github.com/Motmedel/utils_go v0.0.451
 	github.com/miekg/dns v1.1.70
 )
 
