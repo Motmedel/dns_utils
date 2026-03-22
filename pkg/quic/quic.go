@@ -80,7 +80,7 @@ func Exchange(
 		if closeStreamInDefer {
 			if err := stream.Close(); err != nil {
 				slog.WarnContext(
-					motmedelContext.WithErrorContextValue(
+					motmedelContext.WithError(
 						ctx,
 						motmedelErrors.NewWithTrace(fmt.Errorf("stream close: %w", err)),
 					),

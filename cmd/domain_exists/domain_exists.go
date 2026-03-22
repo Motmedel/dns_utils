@@ -119,7 +119,7 @@ func main() {
 			weightedSemaphore.Release(acquireWeight)
 			if err != nil {
 				logger.WarnContext(
-					motmedelContext.WithErrorContextValue(
+					motmedelContext.WithError(
 						ctx,
 						motmedelErrors.New(
 							fmt.Errorf("supports dnssec: %w", err),
