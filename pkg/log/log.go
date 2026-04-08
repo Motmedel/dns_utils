@@ -312,6 +312,12 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *schema.Base {
 func ExtractDnsContext(ctx context.Context, record *slog.Record) error {
 	if dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext); ok && dnsContext != nil {
 		if base := ParseDnsContext(dnsContext); base != nil {
+			if base.Message != "" {
+				record.Message = base.Message
+				// Prevent the message from being emitted again as a top-level attribute.
+				base.Message = ""
+			}
+
 			baseMap, err := motmedelJson.ObjectToMap(base)
 			if err != nil {
 				return motmedelErrors.NewWithTrace(fmt.Errorf("object to map: %w", err), base)
