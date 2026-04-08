@@ -113,6 +113,104 @@ func ParseDnsMessage(message *dns.Msg) *schema.Base {
 	return base
 }
 
+func MakeDnsMessage(base *schema.Base) string {
+	if base == nil {
+		return ""
+	}
+
+	clientAddress := "-"
+	for _, target := range []*schema.Target{base.Client, base.Source} {
+		if target == nil {
+			continue
+		}
+		if target.Ip != "" {
+			clientAddress = formatHostPort(target.Ip, target.Port)
+			break
+		}
+	}
+
+	serverAddress := "-"
+	for _, target := range []*schema.Target{base.Server, base.Destination} {
+		if target == nil {
+			continue
+		}
+		if target.Ip != "" {
+			serverAddress = formatHostPort(target.Ip, target.Port)
+			break
+		}
+	}
+
+	transport := "-"
+	if network := base.Network; network != nil {
+		if network.Transport != "" {
+			transport = network.Transport
+		}
+	}
+
+	questionName := "-"
+	questionClass := "-"
+	questionType := "-"
+	responseCode := "-"
+	answerData := "-"
+
+	if ecsDns := base.Dns; ecsDns != nil {
+		if question := ecsDns.Question; question != nil {
+			if question.Name != "" {
+				questionName = question.Name
+			}
+			if question.Class != "" {
+				questionClass = question.Class
+			}
+			if question.Type != "" {
+				questionType = question.Type
+			}
+		}
+
+		if ecsDns.ResponseCode != "" {
+			responseCode = ecsDns.ResponseCode
+		}
+
+		if len(ecsDns.ResolvedIp) != 0 {
+			answerData = strings.Join(ecsDns.ResolvedIp, ",")
+		} else if len(ecsDns.Answers) != 0 {
+			var parts []string
+			for _, answer := range ecsDns.Answers {
+				if answer == nil {
+					continue
+				}
+				if answer.Data != "" {
+					parts = append(parts, answer.Data)
+				}
+			}
+			if len(parts) != 0 {
+				answerData = strings.Join(parts, ",")
+			}
+		}
+	}
+
+	return fmt.Sprintf(
+		"%s -> %s %s \"%s %s %s\" %s \"%s\"",
+		clientAddress,
+		serverAddress,
+		transport,
+		questionName,
+		questionClass,
+		questionType,
+		responseCode,
+		answerData,
+	)
+}
+
+func formatHostPort(ip string, port int) string {
+	if ip == "" {
+		return "-"
+	}
+	if port == 0 {
+		return ip
+	}
+	return net.JoinHostPort(ip, strconv.Itoa(port))
+}
+
 func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *schema.Base {
 	if dnsContext == nil {
 		return nil
@@ -205,6 +303,8 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *schema.Base {
 	}
 	EnrichWithDnsMessage(base, message)
 	schemaUtils.EnrichWithTlsContext(base, dnsContext.TlsContext)
+
+	base.Message = MakeDnsMessage(base)
 
 	return base
 }
