@@ -210,12 +210,19 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	dnsContext.QuestionMessage = message
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if connection == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("connection"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))
 	}
 
 	// Exchange
@@ -223,12 +230,6 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	responseMessage, _, err := client.ExchangeWithConn(message, connection)
 
 	// Populate the DNS context.
-
-	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
-	if !ok || dnsContext == nil {
-		dnsContext = &dnsUtilsTypes.DnsContext{}
-	}
-	ctxWithDnsContext := context.WithValue(context.Background(), dnsUtilsContext.DnsContextKey, dnsContext)
 
 	if err := populateDnsContext(dnsContext, connection, message, responseMessage); err != nil {
 		return nil, motmedelErrors.NewWithTraceCtx(
@@ -267,20 +268,30 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	dnsContext.QuestionMessage = message
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = serverAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	connection, err := client.Dial(serverAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("client dial: %w", err))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("client dial: %w", err))
 	}
 	if connection == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("connection"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))
 	}
 	defer func() {
 		if err := connection.Close(); err != nil {
@@ -291,12 +302,18 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		}
 	}()
 
-	responseMessage, err := ExchangeWithConn(ctx, message, client, connection)
+	// Pass the shared DnsContext to ExchangeWithConn so it populates the same instance.
+	ctxForExchange := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
+	responseMessage, err := ExchangeWithConn(ctxForExchange, message, client, connection)
 	if err != nil {
-		return nil, motmedelErrors.New(fmt.Errorf("exchange with conn: %w", err), connection)
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("exchange with conn: %w", err),
+		)
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("response message"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
 	}
 
 	return responseMessage, nil
@@ -307,34 +324,46 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	dnsContext.QuestionMessage = message
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = serverAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
-	responseMessage, err := Exchange(ctx, message, client, serverAddress)
+	ctxForExchange := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
+	responseMessage, err := Exchange(ctxForExchange, message, client, serverAddress)
 	if err != nil {
-		return nil, fmt.Errorf("exchange: %w", err)
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("exchange: %w", err))
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("response message"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
 	}
 
 	if responseMessage.Truncated {
 		tcpDnsClient := *client
 		tcpDnsClient.Net = "tcp"
 
-		responseMessage, err = Exchange(ctx, message, &tcpDnsClient, serverAddress)
+		responseMessage, err = Exchange(ctxForExchange, message, &tcpDnsClient, serverAddress)
 		if err != nil {
-			return nil, motmedelErrors.New(fmt.Errorf("exchange: %w", err), tcpDnsClient)
+			return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("exchange: %w", err))
 		}
 	}
 
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("response message"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
 	}
 
 	return responseMessage.Answer, nil
@@ -351,16 +380,25 @@ func GetDnsAnswers(
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = serverAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if recordType == 0 {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrUnsetRecordType)
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, dnsUtilsErrors.ErrUnsetRecordType)
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	message := &dns.Msg{}
@@ -372,7 +410,17 @@ func GetDnsAnswers(
 		}
 	}
 
-	return GetDnsAnswersWithMessage(ctx, message, client, serverAddress)
+	dnsContext.QuestionMessage = message
+	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
+	answers, err := GetDnsAnswersWithMessage(ctxForDownstream, message, client, serverAddress)
+	if err != nil {
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("get dns answers with message: %w", err),
+		)
+	}
+	return answers, nil
 }
 
 func GetAnswerString(answer dns.RR) string {
@@ -413,21 +461,35 @@ func GetDnsAnswerStrings(
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = dnsServerAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if recordType == 0 {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrUnsetRecordType)
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, dnsUtilsErrors.ErrUnsetRecordType)
 	}
 
 	if dnsClient == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if dnsServerAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
-	answers, err := GetDnsAnswers(ctx, domain, recordType, dnsClient, dnsServerAddress)
+	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
+	answers, err := GetDnsAnswers(ctxForDownstream, domain, recordType, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, fmt.Errorf("get dns answers: %w", err)
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("get dns answers: %w", err),
+		)
 	}
 
 	var answerStrings []string
@@ -452,17 +514,31 @@ func GetPrefixedTxtRecordStrings(
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = dnsServerAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if dnsClient == nil {
-		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if dnsServerAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
-	answerStrings, err := GetDnsAnswerStrings(ctx, domain, dns.TypeTXT, dnsClient, dnsServerAddress)
+	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
+	answerStrings, err := GetDnsAnswerStrings(ctxForDownstream, domain, dns.TypeTXT, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, fmt.Errorf("get dns answer strings: %w", err)
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("get dns answer strings: %w", err),
+		)
 	}
 
 	var prefixedAnswerStrings []string
@@ -481,16 +557,27 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 		return false, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = serverAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if client == nil {
-		return false, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return false, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
+	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
 	// NOTE: The question type should not matter?
-	_, err := GetDnsAnswers(ctx, domain, dns.TypeSOA, client, serverAddress)
+	_, err := GetDnsAnswers(ctxForDownstream, domain, dns.TypeSOA, client, serverAddress)
 	if err != nil {
 		var rcodeError *dnsUtilsErrors.RcodeError
 		if errors.As(err, &rcodeError) {
@@ -498,7 +585,7 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 				return false, nil
 			}
 		}
-		return false, fmt.Errorf("get dns answers: %w", err)
+		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("get dns answers: %w", err))
 	}
 
 	return true, nil
@@ -509,12 +596,21 @@ func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serv
 		return false, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = serverAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if client == nil {
-		return false, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
+		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return false, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	message := new(dns.Msg)
@@ -528,9 +624,15 @@ func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serv
 
 	message.Extra = append(message.Extra, opt)
 
-	answers, err := GetDnsAnswersWithMessage(ctx, message, client, serverAddress)
+	dnsContext.QuestionMessage = message
+	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
+
+	answers, err := GetDnsAnswersWithMessage(ctxForDownstream, message, client, serverAddress)
 	if err != nil {
-		return false, motmedelErrors.New(fmt.Errorf("get dns answers with message: %w", err), message)
+		return false, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("get dns answers with message: %w", err),
+		)
 	}
 
 	dnssecSupported := false

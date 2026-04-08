@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
+	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
+	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
 	"github.com/Motmedel/utils_go/pkg/errors/types/nil_error"
 	"github.com/miekg/dns"
@@ -232,6 +235,26 @@ func assertEmptyField(t *testing.T, err error, field string) {
 	}
 }
 
+// extractDnsContext walks the error chain for an *ExtendedError with a
+// *DnsContext stored in its attached context.
+func extractDnsContext(t *testing.T, err error) *dnsUtilsTypes.DnsContext {
+	t.Helper()
+
+	var extErr *motmedelErrors.ExtendedError
+	if !errors.As(err, &extErr) {
+		t.Fatalf("expected *motmedelErrors.ExtendedError, got %T (%v)", err, err)
+	}
+	ctxPtr := extErr.GetContext()
+	if ctxPtr == nil {
+		t.Fatal("ExtendedError.Context is nil")
+	}
+	dnsCtx, ok := (*ctxPtr).Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsCtx == nil {
+		t.Fatal("DnsContext not found in error context")
+	}
+	return dnsCtx
+}
+
 func TestExchange_NilMessage(t *testing.T) {
 	got, err := Exchange(context.Background(), nil, &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
@@ -404,4 +427,124 @@ func TestSupportsDnssec_NilClient(t *testing.T) {
 func TestSupportsDnssec_EmptyServer(t *testing.T) {
 	_, err := SupportsDnssec(context.Background(), "example.com", &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
+}
+
+// The tests below verify the "error with context" pattern: errors returned from
+// the exported functions should carry a DnsContext that has been populated with
+// whatever information was available at failure time.
+
+func TestExchange_Error_AttachesDnsContextWithQuestion(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
+
+	_, err := Exchange(context.Background(), msg, nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.QuestionMessage != msg {
+		t.Errorf("DnsContext.QuestionMessage = %v, want %v", dnsCtx.QuestionMessage, msg)
+	}
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestExchange_Error_ReusesExistingDnsContext(t *testing.T) {
+	existing := &dnsUtilsTypes.DnsContext{}
+	ctx := dnsUtilsContext.WithDnsContextValue(context.Background(), existing)
+
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
+
+	_, err := Exchange(ctx, msg, &dns.Client{}, "")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx != existing {
+		t.Errorf("DnsContext is not the caller-supplied instance")
+	}
+	if existing.QuestionMessage != msg {
+		t.Errorf("caller DnsContext.QuestionMessage not populated")
+	}
+}
+
+func TestExchangeWithConn_Error_AttachesDnsContext(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
+
+	_, err := ExchangeWithConn(context.Background(), msg, nil, &dns.Conn{})
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.QuestionMessage != msg {
+		t.Errorf("DnsContext.QuestionMessage not set on error")
+	}
+}
+
+func TestGetDnsAnswersWithMessage_Error_AttachesDnsContext(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
+
+	_, err := GetDnsAnswersWithMessage(context.Background(), msg, nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.QuestionMessage != msg {
+		t.Errorf("DnsContext.QuestionMessage not set on error")
+	}
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestGetDnsAnswers_Error_AttachesDnsContext(t *testing.T) {
+	_, err := GetDnsAnswers(context.Background(), "example.com", dns.TypeA, nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestGetDnsAnswers_UnsetRecordType_AttachesDnsContext(t *testing.T) {
+	_, err := GetDnsAnswers(context.Background(), "example.com", 0, &dns.Client{}, "1.2.3.4:53")
+	if !errors.Is(err, dnsUtilsErrors.ErrUnsetRecordType) {
+		t.Fatalf("err = %v, want ErrUnsetRecordType", err)
+	}
+	dnsCtx := extractDnsContext(t, err)
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestGetDnsAnswerStrings_Error_AttachesDnsContext(t *testing.T) {
+	_, err := GetDnsAnswerStrings(context.Background(), "example.com", dns.TypeA, nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestGetPrefixedTxtRecordStrings_Error_AttachesDnsContext(t *testing.T) {
+	_, err := GetPrefixedTxtRecordStrings(context.Background(), "example.com", "v=", nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestDomainExists_Error_AttachesDnsContext(t *testing.T) {
+	_, err := DomainExists(context.Background(), "example.com", nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
+}
+
+func TestSupportsDnssec_Error_AttachesDnsContext(t *testing.T) {
+	_, err := SupportsDnssec(context.Background(), "example.com", nil, "1.2.3.4:53")
+	dnsCtx := extractDnsContext(t, err)
+
+	if dnsCtx.ServerAddress != "1.2.3.4:53" {
+		t.Errorf("DnsContext.ServerAddress = %q, want %q", dnsCtx.ServerAddress, "1.2.3.4:53")
+	}
 }

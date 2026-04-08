@@ -31,52 +31,59 @@ func Exchange(
 		return nil, nil
 	}
 
+	dnsContext, ok := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
+	if !ok || dnsContext == nil {
+		dnsContext = &dnsUtilsTypes.DnsContext{}
+	}
+	dnsContext.QuestionMessage = message
+	if dnsContext.ServerAddress == "" {
+		dnsContext.ServerAddress = serverAddress
+	}
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{NextProtos: []string{"doq"}}
 	}
 
-	dnsContext := ctx.Value(dnsUtilsContext.DnsContextKey).(*dnsUtilsTypes.DnsContext)
-	if dnsContext != nil {
-		dnsContext.QuestionMessage = message
-	}
-
 	messageBytes, err := message.Pack()
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("request pack: %w", err))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("request pack: %w", err))
 	}
 
 	connection, err := quic.DialAddr(ctx, serverAddress, tlsConfig, quicConfig)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("quic dial addr: %w", err))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("quic dial addr: %w", err))
 	}
-	if dnsContext != nil {
-		var localAddrString string
-		if localAddr := connection.LocalAddr(); localAddr != nil {
-			localAddrString = localAddr.String()
-		}
 
-		var remoteAddrString string
-		var transport string
-		if remoteAddr := connection.RemoteAddr(); remoteAddr != nil {
-			remoteAddrString = remoteAddr.String()
-			transport = remoteAddr.Network()
-		}
-
-		dnsContext.ClientAddress = localAddrString
-		dnsContext.ServerAddress = remoteAddrString
-		dnsContext.Transport = transport
-
-		// TODO: Not sure if I can obtain TLS information? Maybe if I call something other than `quic.DialAddr`?
+	var localAddrString string
+	if localAddr := connection.LocalAddr(); localAddr != nil {
+		localAddrString = localAddr.String()
 	}
+
+	var remoteAddrString string
+	var transport string
+	if remoteAddr := connection.RemoteAddr(); remoteAddr != nil {
+		remoteAddrString = remoteAddr.String()
+		transport = remoteAddr.Network()
+	}
+
+	dnsContext.ClientAddress = localAddrString
+	dnsContext.ServerAddress = remoteAddrString
+	dnsContext.Transport = transport
+
+	// TODO: Not sure if I can obtain TLS information? Maybe if I call something other than `quic.DialAddr`?
 
 	closeStreamInDefer := true
 	stream, err := connection.OpenStreamSync(ctx)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("connection open stream sync: %w", err), connection)
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("connection open stream sync: %w", err),
+		)
 	}
 	defer func() {
 		if closeStreamInDefer {
@@ -94,55 +101,62 @@ func Exchange(
 
 	rawMessageLength := len(messageBytes)
 	if rawMessageLength > 0xFFFF {
-		return nil, motmedelErrors.NewWithTrace(
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
 			fmt.Errorf("%w (%d)", dnsUtilsQuicErrors.ErrMessageLengthOverflow, rawMessageLength),
-			rawMessageLength,
 		)
 	}
 	messageLength := uint16(rawMessageLength)
 
 	if err := binary.Write(stream, binary.BigEndian, messageLength); err != nil {
-		return nil, motmedelErrors.NewWithTrace(
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
 			fmt.Errorf("binary write (message length): %w", err),
-			stream, messageLength,
 		)
 	}
 	if _, err := stream.Write(messageBytes); err != nil {
-		return nil, motmedelErrors.NewWithTrace(
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
 			fmt.Errorf("binary write (message bytes): %w", err),
-			stream, messageBytes,
 		)
 	}
 
 	if err := stream.Close(); err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("stream close: %w", err), stream)
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("stream close: %w", err))
 	}
 	closeStreamInDefer = false
 
 	var responseLength uint16
 	if err := binary.Read(stream, binary.BigEndian, &responseLength); err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("binary read (response length): %w", err), stream)
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("binary read (response length): %w", err),
+		)
 	}
 
 	responseBuffer := make([]byte, responseLength)
 	if _, err := io.ReadFull(stream, responseBuffer); err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("io read full (response): %w", err), stream)
+		return nil, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			fmt.Errorf("io read full (response): %w", err),
+		)
 	}
 
 	var response dns.Msg
 	if err := response.Unpack(responseBuffer); err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("response unpack: %w", err), responseBuffer)
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("response unpack: %w", err))
 	}
 
-	if dnsContext != nil {
-		// TODO: Maybe I can obtain an earlier time?
-		t := time.Now()
-		dnsContext.Time = &t
-		dnsContext.AnswerMessage = &response
-	}
+	// TODO: Maybe I can obtain an earlier time?
+	t := time.Now()
+	dnsContext.Time = &t
+	dnsContext.AnswerMessage = &response
 
 	if response.Rcode != dns.RcodeSuccess {
-		return &response, motmedelErrors.NewWithTrace(&dnsUtilsErrors.RcodeError{Rcode: response.Rcode})
+		return &response, motmedelErrors.NewWithTraceCtx(
+			ctxWithDnsContext,
+			&dnsUtilsErrors.RcodeError{Rcode: response.Rcode},
+		)
 	}
 
 	return &response, nil

@@ -11,16 +11,18 @@ import (
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
-	"github.com/Motmedel/ecs_go/ecs"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	motmedelIter "github.com/Motmedel/utils_go/pkg/iter"
 	motmedelJson "github.com/Motmedel/utils_go/pkg/json"
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
-	domain_parts "github.com/Motmedel/utils_go/pkg/net/types/domain_parts"
+	"github.com/Motmedel/utils_go/pkg/net/types/domain_parts"
+	"github.com/Motmedel/utils_go/pkg/net/types/flow_tuple"
+	"github.com/Motmedel/utils_go/pkg/schema"
+	schemaUtils "github.com/Motmedel/utils_go/pkg/schema/utils"
 	"github.com/miekg/dns"
 )
 
-func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
+func EnrichWithDnsMessage(base *schema.Base, message *dns.Msg) {
 	if base == nil {
 		return
 	}
@@ -36,7 +38,7 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 
 	ecsDns := base.Dns
 	if ecsDns == nil {
-		ecsDns = &ecs.Dns{}
+		ecsDns = &schema.Dns{}
 		base.Dns = ecsDns
 	}
 
@@ -52,7 +54,7 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 			parts = *parsedParts
 		}
 
-		ecsDns.Question = &ecs.DnsQuestion{
+		ecsDns.Question = &schema.DnsQuestion{
 			Parts: parts,
 			Class: dns.ClassToString[question.Qclass],
 			Name:  strings.TrimSuffix(question.Name, "."),
@@ -80,7 +82,7 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 
 		ecsDns.Answers = append(
 			ecsDns.Answers,
-			&ecs.DnsAnswer{
+			&schema.DnsAnswer{
 				Class: dns.ClassToString[answerHeader.Class],
 				Data:  answerData,
 				Name:  strings.TrimSuffix(answerHeader.Name, "."),
@@ -100,18 +102,18 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 	}
 }
 
-func ParseDnsMessage(message *dns.Msg) *ecs.Base {
+func ParseDnsMessage(message *dns.Msg) *schema.Base {
 	if message == nil {
 		return nil
 	}
 
-	base := &ecs.Base{Network: &ecs.Network{Protocol: "dns"}}
+	base := &schema.Base{Network: &schema.Network{Protocol: "dns"}}
 	EnrichWithDnsMessage(base, message)
 
 	return base
 }
 
-func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
+func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *schema.Base {
 	if dnsContext == nil {
 		return nil
 	}
@@ -137,12 +139,15 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 		ianaNumber = 17
 	}
 
-	var ecsServer *ecs.Target
+	var ecsServer *schema.Target
+	var serverIp net.IP
+	var serverPort uint16
 	if address := dnsContext.ServerAddress; address != "" {
-		ecsServer = &ecs.Target{}
+		ecsServer = &schema.Target{}
 		if host, port, err := net.SplitHostPort(address); err == nil {
 			ecsServer.Address = host
 			if addressIp := net.ParseIP(host); addressIp != nil {
+				serverIp = addressIp
 				ecsServer.Ip = addressIp.String()
 			} else {
 				ecsServer.Domain = address
@@ -151,17 +156,21 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 			if port != "" {
 				if portNum, err := strconv.Atoi(port); err == nil {
 					ecsServer.Port = portNum
+					serverPort = uint16(portNum)
 				}
 			}
 		}
 	}
 
-	var ecsClient *ecs.Target
+	var ecsClient *schema.Target
+	var clientIp net.IP
+	var clientPort uint16
 	if address := dnsContext.ClientAddress; address != "" {
-		ecsClient = &ecs.Target{}
+		ecsClient = &schema.Target{}
 		if host, port, err := net.SplitHostPort(address); err == nil {
 			ecsClient.Address = host
 			if addressIp := net.ParseIP(host); addressIp != nil {
+				clientIp = addressIp
 				ecsClient.Ip = addressIp.String()
 			} else {
 				ecsClient.Domain = address
@@ -170,18 +179,22 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 			if port != "" {
 				if portNum, err := strconv.Atoi(port); err == nil {
 					ecsClient.Port = portNum
+					clientPort = uint16(portNum)
 				}
 			}
 		}
 	}
 
 	var communityIdSlice []string
-	if communityId := ecs.CommunityIdFromTargets(ecsClient, ecsServer, ianaNumber); communityId != "" {
-		communityIdSlice = []string{communityId}
+
+	if flowTuple := flow_tuple.New(clientIp, serverIp, clientPort, serverPort, uint8(ianaNumber)); flowTuple != nil {
+		if communityId := flowTuple.Hash(); communityId != "" {
+			communityIdSlice = []string{communityId}
+		}
 	}
 
-	base := &ecs.Base{
-		Network: &ecs.Network{
+	base := &schema.Base{
+		Network: &schema.Network{
 			CommunityId: communityIdSlice,
 			Protocol:    "dns",
 			Transport:   transport,
@@ -191,7 +204,7 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *ecs.Base {
 		Server: ecsServer,
 	}
 	EnrichWithDnsMessage(base, message)
-	ecs.EnrichWithTlsContext(base, dnsContext.TlsContext)
+	schemaUtils.EnrichWithTlsContext(base, dnsContext.TlsContext)
 
 	return base
 }
