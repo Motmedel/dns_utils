@@ -16,8 +16,7 @@ import (
 	motmedelIter "github.com/Motmedel/utils_go/pkg/iter"
 	motmedelJson "github.com/Motmedel/utils_go/pkg/json"
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
-	motmedelNet "github.com/Motmedel/utils_go/pkg/net"
-	"github.com/Motmedel/utils_go/pkg/net/domain_breakdown"
+	domain_parts "github.com/Motmedel/utils_go/pkg/net/types/domain_parts"
 	"github.com/miekg/dns"
 )
 
@@ -46,18 +45,18 @@ func EnrichWithDnsMessage(base *ecs.Base, message *dns.Msg) {
 	ecsDns.OpCode = dns.OpcodeToString[message.Opcode]
 
 	if question != nil {
-		var domainBreakdown motmedelNet.DomainBreakdown
+		var parts domain_parts.Parts
 
-		parsedDomainBreakdown := domain_breakdown.GetDomainBreakdown(strings.TrimSuffix(question.Name, "."))
-		if parsedDomainBreakdown != nil {
-			domainBreakdown = *parsedDomainBreakdown
+		parsedParts := domain_parts.New(strings.TrimSuffix(question.Name, "."))
+		if parsedParts != nil {
+			parts = *parsedParts
 		}
 
 		ecsDns.Question = &ecs.DnsQuestion{
-			DomainBreakdown: domainBreakdown,
-			Class:           dns.ClassToString[question.Qclass],
-			Name:            strings.TrimSuffix(question.Name, "."),
-			Type:            dns.TypeToString[question.Qtype],
+			Parts: parts,
+			Class: dns.ClassToString[question.Qclass],
+			Name:  strings.TrimSuffix(question.Name, "."),
+			Type:  dns.TypeToString[question.Qtype],
 		}
 	}
 
