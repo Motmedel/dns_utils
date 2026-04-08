@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
-	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
 	"github.com/miekg/dns"
 )
 
@@ -52,7 +52,7 @@ func (client *Client) SupportsDnssec(ctx context.Context, domain string) (bool, 
 
 func NewWithAddress(address string) (*Client, error) {
 	if address == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	var client dns.Client
@@ -68,7 +68,7 @@ func New(ctx context.Context) (*Client, error) {
 	}
 
 	if len(dnsServerAddresses) == 0 {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	return NewWithAddress(dnsServerAddresses[0] + ":53")

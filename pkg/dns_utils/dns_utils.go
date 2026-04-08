@@ -16,6 +16,8 @@ import (
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
+	"github.com/Motmedel/utils_go/pkg/errors/types/nil_error"
 	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
 )
@@ -209,11 +211,11 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if connection == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilConnection)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("connection"))
 	}
 
 	// Exchange
@@ -246,7 +248,7 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	if responseMessage == nil {
 		return nil, motmedelErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
-			fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage),
+			nil_error.New("response message"),
 		)
 	}
 
@@ -266,11 +268,11 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	connection, err := client.Dial(serverAddress)
@@ -278,7 +280,7 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("client dial: %w", err))
 	}
 	if connection == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilConnection)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("connection"))
 	}
 	defer func() {
 		if err := connection.Close(); err != nil {
@@ -294,7 +296,7 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		return nil, motmedelErrors.New(fmt.Errorf("exchange with conn: %w", err), connection)
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("response message"))
 	}
 
 	return responseMessage, nil
@@ -306,11 +308,11 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	responseMessage, err := Exchange(ctx, message, client, serverAddress)
@@ -318,7 +320,7 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 		return nil, fmt.Errorf("exchange: %w", err)
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("response message"))
 	}
 
 	if responseMessage.Truncated {
@@ -332,7 +334,7 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	}
 
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("%w (response)", dnsUtilsErrors.ErrNilMessage))
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("response message"))
 	}
 
 	return responseMessage.Answer, nil
@@ -354,11 +356,11 @@ func GetDnsAnswers(
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	message := &dns.Msg{}
@@ -416,11 +418,11 @@ func GetDnsAnswerStrings(
 	}
 
 	if dnsClient == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if dnsServerAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	answers, err := GetDnsAnswers(ctx, domain, recordType, dnsClient, dnsServerAddress)
@@ -451,11 +453,11 @@ func GetPrefixedTxtRecordStrings(
 	}
 
 	if dnsClient == nil {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return nil, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if dnsServerAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	answerStrings, err := GetDnsAnswerStrings(ctx, domain, dns.TypeTXT, dnsClient, dnsServerAddress)
@@ -480,11 +482,11 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 	}
 
 	if client == nil {
-		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return false, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return false, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	// NOTE: The question type should not matter?
@@ -508,11 +510,11 @@ func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serv
 	}
 
 	if client == nil {
-		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrNilDnsClient)
+		return false, motmedelErrors.NewWithTrace(nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return false, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return false, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	message := new(dns.Msg)

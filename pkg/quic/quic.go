@@ -5,17 +5,19 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"log/slog"
+	"time"
+
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsQuicErrors "github.com/Motmedel/dns_utils/pkg/quic/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
 	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
 	"github.com/miekg/dns"
 	"github.com/quic-go/quic-go"
-	"io"
-	"log/slog"
-	"time"
 )
 
 func Exchange(
@@ -30,7 +32,7 @@ func Exchange(
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTrace(dnsUtilsErrors.ErrEmptyDnsServer)
+		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	if tlsConfig == nil {
@@ -80,7 +82,7 @@ func Exchange(
 		if closeStreamInDefer {
 			if err := stream.Close(); err != nil {
 				slog.WarnContext(
-					motmedelContext.WithErrorContextValue(
+					motmedelContext.WithError(
 						ctx,
 						motmedelErrors.NewWithTrace(fmt.Errorf("stream close: %w", err)),
 					),
