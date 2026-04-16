@@ -96,6 +96,12 @@ func GetDnsServers(ctx context.Context) ([]string, error) {
 }
 
 // ApplyRemainingTtl rewrites every RR TTL to the remaining seconds.
+//
+// OPT, TSIG and SIG records are skipped: their RR header "TTL" field is
+// overloaded (e.g. OPT encodes extended-rcode/version/DO/Z per RFC 6891),
+// so blindly rewriting it would corrupt the EDNS extended flags — most
+// visibly stripping the DO bit and leaving garbage in the MBZ field,
+// which breaks DNSSEC validation downstream.
 func ApplyRemainingTtl(message *dns.Msg, seconds uint32) {
 	if message == nil {
 		return
@@ -104,6 +110,11 @@ func ApplyRemainingTtl(message *dns.Msg, seconds uint32) {
 	update := func(records []dns.RR) {
 		for _, record := range records {
 			if record == nil {
+				continue
+			}
+
+			switch record.(type) {
+			case *dns.OPT, *dns.TSIG, *dns.SIG:
 				continue
 			}
 

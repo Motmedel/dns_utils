@@ -99,6 +99,32 @@ func TestApplyRemainingTtl_RewritesAllSections(t *testing.T) {
 	}
 }
 
+func TestApplyRemainingTtl_PreservesOptEdnsFlags(t *testing.T) {
+	// The OPT pseudo-record's "Ttl" field encodes
+	// (extended-rcode, version, DO, Z) per RFC 6891. Rewriting it would
+	// strip the DO bit and corrupt the MBZ field, breaking DNSSEC
+	// validation downstream.
+	opt := &dns.OPT{Hdr: dns.RR_Header{Name: ".", Rrtype: dns.TypeOPT, Class: 4096}}
+	opt.SetDo()
+	originalTtl := opt.Hdr.Ttl
+
+	msg := &dns.Msg{
+		Answer: []dns.RR{makeA(100, "1.2.3.4")},
+		Extra:  []dns.RR{opt},
+	}
+	ApplyRemainingTtl(msg, 7)
+
+	if msg.Answer[0].Header().Ttl != 7 {
+		t.Errorf("Answer TTL = %d, want 7", msg.Answer[0].Header().Ttl)
+	}
+	if opt.Hdr.Ttl != originalTtl {
+		t.Errorf("OPT TTL = 0x%x, want 0x%x (unchanged)", opt.Hdr.Ttl, originalTtl)
+	}
+	if !opt.Do() {
+		t.Errorf("OPT DO bit was cleared")
+	}
+}
+
 func TestEffectiveMessageTtl_Nil(t *testing.T) {
 	if got := EffectiveMessageTtl(nil); got != 0 {
 		t.Errorf("EffectiveMessageTtl(nil) = %v, want 0", got)
