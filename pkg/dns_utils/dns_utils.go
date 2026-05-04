@@ -83,12 +83,13 @@ func GetDnsServers(ctx context.Context) ([]string, error) {
 	var dnsServers []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "nameserver") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				dnsServers = append(dnsServers, fields[1])
-			}
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || line[0] == '#' || line[0] == ';' {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "nameserver" {
+			dnsServers = append(dnsServers, fields[1])
 		}
 	}
 
@@ -297,9 +298,9 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
-	connection, err := client.Dial(serverAddress)
+	connection, err := client.DialContext(ctx, serverAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("client dial: %w", err))
+		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("client dial context: %w", err))
 	}
 	if connection == nil {
 		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))

@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+
 	"github.com/miekg/dns"
 )
 
@@ -16,12 +17,12 @@ type RcodeError struct {
 	Rcode int
 }
 
-func (rcodeError *RcodeError) Is(target error) bool {
+func (e *RcodeError) Is(target error) bool {
 	return target == ErrUnsuccessfulRcode
 }
 
-func (rcodeError *RcodeError) Error() string {
-	rcode := rcodeError.Rcode
+func (e *RcodeError) Error() string {
+	rcode := e.Rcode
 
 	msg := fmt.Sprintf("%s: %d", ErrUnsuccessfulRcode, rcode)
 	if rcodeString, ok := dns.RcodeToString[rcode]; ok && rcodeString != "" {
@@ -35,14 +36,14 @@ type MultipleRecordsError struct {
 	Records []string
 }
 
-func (multipleRecordsError *MultipleRecordsError) Is(target error) bool {
+func (e *MultipleRecordsError) Is(target error) bool {
 	return target == ErrMultipleRecords
 }
 
-func (multipleRecordsError *MultipleRecordsError) Error() string {
+func (e *MultipleRecordsError) Error() string {
 	return ErrMultipleRecords.Error()
 }
 
-func (multipleRecordsError *MultipleRecordsError) GetInput() any {
-	return multipleRecordsError.Records
+func (e *MultipleRecordsError) GetInput() any {
+	return e.Records
 }

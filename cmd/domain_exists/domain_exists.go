@@ -9,6 +9,7 @@ import (
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsLog "github.com/Motmedel/dns_utils/pkg/log"
 	dnsUtilsClient "github.com/Motmedel/dns_utils/pkg/types/client"
+	dnsUtilsClientConfig "github.com/Motmedel/dns_utils/pkg/types/client/config"
 	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
 	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
@@ -16,6 +17,7 @@ import (
 	motmedelLogHandler "github.com/Motmedel/utils_go/pkg/log/handler"
 	"golang.org/x/sync/semaphore"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -77,19 +79,10 @@ func main() {
 		if len(dnsServers) == 0 {
 			logger.FatalWithExitingMessage("No DNS servers could be obtained and none was provided.", nil)
 		}
-		dnsServerAddress = dnsServers[0] + ":53"
+		dnsServerAddress = net.JoinHostPort(dnsServers[0], "53")
 	}
 
-	dnsClient, err := dnsUtilsClient.NewWithAddress(dnsServerAddress)
-	if err != nil {
-		logger.FatalWithExitingMessage(
-			"An error occurred when creating a DNS client.",
-			motmedelErrors.New(
-				fmt.Errorf("dns utils client new with address: %w", err),
-				dnsServerAddress,
-			),
-		)
-	}
+	dnsClient := dnsUtilsClient.New(dnsUtilsClientConfig.WithAddress(dnsServerAddress))
 
 	weightedSemaphore := semaphore.NewWeighted(int64(numConcurrent))
 	var waitGroup sync.WaitGroup
