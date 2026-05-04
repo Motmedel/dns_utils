@@ -5,6 +5,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
+	"net"
+	"os"
+	"strings"
+	"sync"
+
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsLog "github.com/Motmedel/dns_utils/pkg/log"
@@ -16,11 +22,6 @@ import (
 	motmedelErrorLogger "github.com/Motmedel/utils_go/pkg/log/error_logger"
 	motmedelLogHandler "github.com/Motmedel/utils_go/pkg/log/handler"
 	"golang.org/x/sync/semaphore"
-	"log/slog"
-	"net"
-	"os"
-	"strings"
-	"sync"
 )
 
 func main() {

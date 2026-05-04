@@ -5,6 +5,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
+	"net"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsLog "github.com/Motmedel/dns_utils/pkg/log"
@@ -15,12 +22,6 @@ import (
 	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
 	motmedelErrorLogger "github.com/Motmedel/utils_go/pkg/log/error_logger"
 	"golang.org/x/sync/semaphore"
-	"log/slog"
-	"net"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 func main() {
@@ -66,7 +67,7 @@ func main() {
 	}
 
 	if dnsServerAddress == "" {
-		dnsServers, err := dns_utils.GetDnsServers()
+		dnsServers, err := dns_utils.GetDnsServers(context.Background())
 		if err != nil {
 			logger.FatalWithExitingMessage(
 				"An error occurred when getting DNS server addresses.",
