@@ -7,6 +7,8 @@ import (
 )
 
 func TestNew_Defaults(t *testing.T) {
+	t.Parallel()
+
 	c := New()
 	if c == nil {
 		t.Fatal("client = nil, want non-nil")
@@ -26,6 +28,8 @@ func TestNew_Defaults(t *testing.T) {
 }
 
 func TestNew_WithAddress(t *testing.T) {
+	t.Parallel()
+
 	const addr = "1.1.1.1:53"
 	c := New(config.WithAddress(addr))
 	if c == nil {
@@ -37,6 +41,8 @@ func TestNew_WithAddress(t *testing.T) {
 }
 
 func TestDefaultClient(t *testing.T) {
+	t.Parallel()
+
 	if DefaultClient == nil {
 		t.Fatal("DefaultClient is nil")
 	}

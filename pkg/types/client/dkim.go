@@ -11,9 +11,8 @@ import (
 	"strings"
 
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
-	dkimParsing "github.com/Motmedel/utils_go/pkg/dns/parsing/dkim"
-	dnsTypes "github.com/Motmedel/utils_go/pkg/dns/types"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/dns/dkim"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
 
@@ -50,8 +49,8 @@ func (c *Client) GetDkimRecordStringWithDomainName(
 	}
 
 	answers, err := c.GetDnsAnswers(ctx, domainName, dns.TypeTXT)
-	if rcodeError, ok := errors.AsType[*dnsUtilsErrors.RcodeError](err); err != nil && !(ok && rcodeError.Rcode == dns.RcodeNameError) {
-		return "", motmedelErrors.New(
+	if rcodeError, ok := errors.AsType[*dnsUtilsErrors.RcodeError](err); err != nil && (!ok || rcodeError.Rcode != dns.RcodeNameError) {
+		return "", altshiftErrors.New(
 			fmt.Errorf("get dns answers: %w", err),
 			domainName,
 		)
@@ -92,7 +91,7 @@ func (c *Client) GetDkimRecordString(
 	domainName := fmt.Sprintf("%s._domainkey.%s", selector, domain)
 	recordString, err := c.GetDkimRecordStringWithDomainName(ctx, domainName)
 	if err != nil {
-		return "", motmedelErrors.New(
+		return "", altshiftErrors.New(
 			fmt.Errorf("get record string with domain name: %w", err),
 			domainName, c,
 		)
@@ -105,7 +104,7 @@ func (c *Client) GetDkimRecord(
 	ctx context.Context,
 	domain string,
 	selector string,
-) (*dnsTypes.DkimRecord, error) {
+) (*dkim.Record, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -124,10 +123,10 @@ func (c *Client) GetDkimRecord(
 	}
 
 	recordBytes := []byte(recordString)
-	record, err := dkimParsing.ParseRecord(recordBytes)
+	record, err := dkim.ParseRecord(recordBytes)
 	if err != nil {
-		record = &dnsTypes.DkimRecord{Raw: recordString, Domain: domain}
-		return record, motmedelErrors.New(fmt.Errorf("parse dkim record: %w", err), recordBytes)
+		record = &dkim.Record{Raw: recordString, Domain: domain}
+		return record, altshiftErrors.New(fmt.Errorf("parse dkim record: %w", err), recordBytes)
 	}
 	if record == nil {
 		return nil, nil

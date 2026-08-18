@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -11,14 +12,14 @@ import (
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	motmedelIter "github.com/Motmedel/utils_go/pkg/iter"
-	motmedelJson "github.com/Motmedel/utils_go/pkg/json"
-	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
-	"github.com/Motmedel/utils_go/pkg/net/types/domain_parts"
-	"github.com/Motmedel/utils_go/pkg/net/types/flow_tuple"
-	"github.com/Motmedel/utils_go/pkg/schema"
-	schemaUtils "github.com/Motmedel/utils_go/pkg/schema/utils"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
+	altshiftIter "github.com/altshiftab/utils_go/pkg/iter"
+	altshiftJson "github.com/altshiftab/utils_go/pkg/json"
+	altshiftLog "github.com/altshiftab/utils_go/pkg/log"
+	"github.com/altshiftab/utils_go/pkg/net/types/domain_parts"
+	"github.com/altshiftab/utils_go/pkg/net/types/flow_tuple"
+	"github.com/altshiftab/utils_go/pkg/schema"
+	schemaUtils "github.com/altshiftab/utils_go/pkg/schema/utils"
 	"github.com/miekg/dns"
 )
 
@@ -92,7 +93,7 @@ func EnrichWithDnsMessage(base *schema.Base, message *dns.Msg) {
 		)
 	}
 
-	ecsDns.ResolvedIp = motmedelIter.Set(resolvedIps)
+	ecsDns.ResolvedIp = altshiftIter.Set(resolvedIps)
 
 	if message.Response {
 		ecsDns.ResponseCode = dns.RcodeToString[message.Rcode]
@@ -252,7 +253,9 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *schema.Base {
 			}
 
 			if port != "" {
-				if portNum, err := strconv.Atoi(port); err == nil {
+				// A port outside the 16-bit range is not one; recording it would
+				// mean wrapping it to an unrelated number.
+				if portNum, err := strconv.Atoi(port); err == nil && portNum >= 0 && portNum <= math.MaxUint16 {
 					ecsServer.Port = portNum
 					serverPort = uint16(portNum)
 				}
@@ -275,7 +278,9 @@ func ParseDnsContext(dnsContext *dnsUtilsTypes.DnsContext) *schema.Base {
 			}
 
 			if port != "" {
-				if portNum, err := strconv.Atoi(port); err == nil {
+				// A port outside the 16-bit range is not one; recording it would
+				// mean wrapping it to an unrelated number.
+				if portNum, err := strconv.Atoi(port); err == nil && portNum >= 0 && portNum <= math.MaxUint16 {
 					ecsClient.Port = portNum
 					clientPort = uint16(portNum)
 				}
@@ -318,16 +323,16 @@ func ExtractDnsContext(ctx context.Context, record *slog.Record) error {
 				base.Message = ""
 			}
 
-			baseMap, err := motmedelJson.ObjectToMap(base)
+			baseMap, err := altshiftJson.ObjectToMap(base)
 			if err != nil {
-				return motmedelErrors.NewWithTrace(fmt.Errorf("object to map: %w", err), base)
+				return altshiftErrors.NewWithTrace(fmt.Errorf("object to map: %w", err), base)
 			}
 
-			record.Add(motmedelLog.AttrsFromMap(baseMap)...)
+			record.Add(altshiftLog.AttrsFromMap(baseMap)...)
 		}
 	}
 
 	return nil
 }
 
-var DnsContextExtractor = motmedelLog.ContextExtractorFunction(ExtractDnsContext)
+var DnsContextExtractor = altshiftLog.ContextExtractorFunction(ExtractDnsContext)

@@ -10,7 +10,7 @@ import (
 
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	"github.com/Motmedel/dns_utils/pkg/types/client/config"
-	"github.com/Motmedel/utils_go/pkg/errors/types/nil_error"
+	"github.com/altshiftab/utils_go/pkg/errors/types/nil_error"
 	"github.com/miekg/dns"
 )
 
@@ -86,10 +86,17 @@ func expectNilDnsClientError(t *testing.T, err error) {
 func startTestDnsServer(t *testing.T, handler dns.HandlerFunc) (*Client, func()) {
 	t.Helper()
 
-	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	var listenConfig net.ListenConfig
+	pc, err := listenConfig.ListenPacket(t.Context(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen packet: %v", err)
 	}
+
+	localAddr := pc.LocalAddr()
+	if localAddr == nil {
+		t.Fatal("expected a local address")
+	}
+	localAddress := localAddr.String()
 
 	server := &dns.Server{
 		PacketConn: pc,
@@ -112,7 +119,7 @@ func startTestDnsServer(t *testing.T, handler dns.HandlerFunc) (*Client, func())
 
 	client := New(
 		config.WithDnsClient(&dns.Client{UDPSize: 4096, Timeout: 2 * time.Second}),
-		config.WithAddress(pc.LocalAddr().String()),
+		config.WithAddress(localAddress),
 	)
 
 	teardown := func() {

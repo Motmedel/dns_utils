@@ -1,7 +1,7 @@
 package types
 
 import (
-	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
+	altshiftTlsTypes "github.com/altshiftab/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
 	"time"
 )
@@ -20,5 +20,5 @@ type DnsContext struct {
 	ServerAddress   string
 	Transport       string
 	Time            *time.Time
-	TlsContext      *motmedelTlsTypes.TlsContext
+	TlsContext      *altshiftTlsTypes.TlsContext
 }

@@ -7,8 +7,8 @@ import (
 
 	"github.com/Motmedel/dns_utils/pkg/dns_utils"
 	"github.com/Motmedel/dns_utils/pkg/types/client/config"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/errors/types/empty_error"
 	"github.com/miekg/dns"
 )
 
@@ -71,7 +71,7 @@ func NewFromResolvConf(ctx context.Context, options ...config.Option) (*Client, 
 	}
 
 	if len(dnsServerAddresses) == 0 {
-		return nil, motmedelErrors.NewWithTrace(empty_error.New("dns server"))
+		return nil, altshiftErrors.NewWithTrace(empty_error.New("dns server"))
 	}
 
 	address := net.JoinHostPort(dnsServerAddresses[0], "53")

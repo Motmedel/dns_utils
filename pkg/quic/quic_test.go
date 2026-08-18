@@ -7,17 +7,17 @@ import (
 
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/errors/types/empty_error"
 	"github.com/miekg/dns"
 )
 
 func extractDnsContext(t *testing.T, err error) *dnsUtilsTypes.DnsContext {
 	t.Helper()
 
-	var extErr *motmedelErrors.ExtendedError
+	var extErr *altshiftErrors.ExtendedError
 	if !errors.As(err, &extErr) {
-		t.Fatalf("expected *motmedelErrors.ExtendedError, got %T (%v)", err, err)
+		t.Fatalf("expected *altshiftErrors.ExtendedError, got %T (%v)", err, err)
 	}
 	ctxPtr := extErr.GetContext()
 	if ctxPtr == nil {
@@ -31,6 +31,8 @@ func extractDnsContext(t *testing.T, err error) *dnsUtilsTypes.DnsContext {
 }
 
 func TestExchange_NilMessage(t *testing.T) {
+	t.Parallel()
+
 	got, err := Exchange(context.Background(), nil, "1.2.3.4:853", nil, nil)
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -41,6 +43,8 @@ func TestExchange_NilMessage(t *testing.T) {
 }
 
 func TestExchange_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
 
@@ -59,6 +63,8 @@ func TestExchange_EmptyServer(t *testing.T) {
 }
 
 func TestExchange_EmptyServer_WithoutPreexistingDnsContext(t *testing.T) {
+	t.Parallel()
+
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
 
@@ -71,6 +77,8 @@ func TestExchange_EmptyServer_WithoutPreexistingDnsContext(t *testing.T) {
 }
 
 func TestExchange_Error_AttachesDnsContextWithQuestion(t *testing.T) {
+	t.Parallel()
+
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
 
@@ -83,6 +91,8 @@ func TestExchange_Error_AttachesDnsContextWithQuestion(t *testing.T) {
 }
 
 func TestExchange_Error_ReusesExistingDnsContext(t *testing.T) {
+	t.Parallel()
+
 	existing := &dnsUtilsTypes.DnsContext{}
 	ctx := dnsUtilsContext.WithDnsContextValue(context.Background(), existing)
 

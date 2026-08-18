@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
 
@@ -45,7 +45,7 @@ func TestGetSpfRecordString_CancelledContext(t *testing.T) {
 	if got != "" {
 		t.Fatalf("got %q want empty", got)
 	}
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err: got %v want context.Canceled", err)
 	}
 }
@@ -85,7 +85,7 @@ func TestGetSpfRecord_CancelledContext(t *testing.T) {
 	if record != nil {
 		t.Fatalf("record: got %v want nil", record)
 	}
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err: got %v want context.Canceled", err)
 	}
 }
@@ -199,7 +199,7 @@ func TestGetSpfRecord_ParseFailureReturnsRawAndError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
-	if !motmedelErrors.IsAny(err, motmedelErrors.ErrSyntaxError, motmedelErrors.ErrSemanticError) {
+	if !altshiftErrors.IsAny(err, altshiftErrors.ErrSyntaxError, altshiftErrors.ErrSemanticError) {
 		t.Fatalf("err: got %v want syntax or semantic", err)
 	}
 	if record == nil {

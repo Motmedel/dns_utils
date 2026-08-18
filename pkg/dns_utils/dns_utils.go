@@ -14,11 +14,11 @@ import (
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
-	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
-	"github.com/Motmedel/utils_go/pkg/errors/types/nil_error"
-	motmedelTlsTypes "github.com/Motmedel/utils_go/pkg/tls/types"
+	altshiftContext "github.com/altshiftab/utils_go/pkg/context"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/errors/types/empty_error"
+	"github.com/altshiftab/utils_go/pkg/errors/types/nil_error"
+	altshiftTlsTypes "github.com/altshiftab/utils_go/pkg/tls/types"
 	"github.com/miekg/dns"
 )
 
@@ -66,14 +66,14 @@ func GetFlagsFromMessage(message *dns.Msg) []string {
 func GetDnsServers(ctx context.Context) ([]string, error) {
 	file, err := os.Open(resolvePath)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTrace(fmt.Errorf("os open: %w", err), resolvePath)
+		return nil, altshiftErrors.NewWithTrace(fmt.Errorf("os open: %w", err), resolvePath)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
 			slog.WarnContext(
-				motmedelContext.WithError(
+				altshiftContext.WithError(
 					ctx,
-					motmedelErrors.NewWithTrace(fmt.Errorf("file close: %w", err), file),
+					altshiftErrors.NewWithTrace(fmt.Errorf("file close: %w", err), file),
 				),
 				"An error occurred when closing the file.",
 			)
@@ -200,7 +200,7 @@ func populateDnsContext(
 
 		if tlsConn, ok := connection.Conn.(*tls.Conn); ok && tlsConn != nil {
 			connectionState := tlsConn.ConnectionState()
-			dnsContext.TlsContext = &motmedelTlsTypes.TlsContext{
+			dnsContext.TlsContext = &altshiftTlsTypes.TlsContext{
 				ConnectionState: &connectionState,
 				ClientInitiated: true,
 			}
@@ -227,14 +227,14 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 		dnsContext = &dnsUtilsTypes.DnsContext{}
 	}
 	dnsContext.QuestionMessage = message
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if connection == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))
 	}
 
 	// Exchange
@@ -249,7 +249,7 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	// Populate the DNS context.
 
 	if err := populateDnsContext(dnsContext, connection, message, responseMessage); err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(
+		return nil, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("populate dns context: %w", err),
 		)
@@ -258,20 +258,20 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	// Return
 
 	if err != nil {
-		return responseMessage, motmedelErrors.NewWithTraceCtx(
+		return responseMessage, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("dns client exchange: %w", err),
 		)
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(
+		return nil, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			nil_error.New("response message"),
 		)
 	}
 
 	if responseMessage.Rcode != dns.RcodeSuccess {
-		return responseMessage, motmedelErrors.NewWithTraceCtx(
+		return responseMessage, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			&dnsUtilsErrors.RcodeError{Rcode: responseMessage.Rcode},
 		)
@@ -293,27 +293,27 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = serverAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	connection, err := client.DialContext(ctx, serverAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("client dial context: %w", err))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("client dial context: %w", err))
 	}
 	if connection == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("connection"))
 	}
 	defer func() {
 		if err := connection.Close(); err != nil {
 			slog.WarnContext(
-				motmedelContext.WithError(ctx, err),
+				altshiftContext.WithError(ctx, err),
 				"An error occurred when closing the connection.",
 			)
 		}
@@ -324,13 +324,13 @@ func Exchange(ctx context.Context, message *dns.Msg, client *dns.Client, serverA
 
 	responseMessage, err := ExchangeWithConn(ctxForExchange, message, client, connection)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(
+		return nil, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("exchange with conn: %w", err),
 		)
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
 	}
 
 	return responseMessage, nil
@@ -349,24 +349,24 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = serverAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	ctxForExchange := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	responseMessage, err := Exchange(ctxForExchange, message, client, serverAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("exchange: %w", err))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("exchange: %w", err))
 	}
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
 	}
 
 	if responseMessage.Truncated {
@@ -375,12 +375,12 @@ func GetDnsAnswersWithMessage(ctx context.Context, message *dns.Msg, client *dns
 
 		responseMessage, err = Exchange(ctxForExchange, message, &tcpDnsClient, serverAddress)
 		if err != nil {
-			return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("exchange: %w", err))
+			return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("exchange: %w", err))
 		}
 	}
 
 	if responseMessage == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("response message"))
 	}
 
 	return responseMessage.Answer, nil
@@ -404,18 +404,18 @@ func GetDnsAnswers(
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = serverAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if recordType == 0 {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, dnsUtilsErrors.ErrUnsetRecordType)
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, dnsUtilsErrors.ErrUnsetRecordType)
 	}
 
 	if client == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	message := &dns.Msg{}
@@ -432,7 +432,7 @@ func GetDnsAnswers(
 
 	answers, err := GetDnsAnswersWithMessage(ctxForDownstream, message, client, serverAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(
+		return nil, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("get dns answers with message: %w", err),
 		)
@@ -485,25 +485,25 @@ func GetDnsAnswerStrings(
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = dnsServerAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if recordType == 0 {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, dnsUtilsErrors.ErrUnsetRecordType)
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, dnsUtilsErrors.ErrUnsetRecordType)
 	}
 
 	if dnsClient == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if dnsServerAddress == "" {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	answers, err := GetDnsAnswers(ctxForDownstream, domain, recordType, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(
+		return nil, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("get dns answers: %w", err),
 		)
@@ -538,21 +538,21 @@ func GetPrefixedTxtRecordStrings(
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = dnsServerAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if dnsClient == nil {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if dnsServerAddress == "" {
-		return nil, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return nil, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	answerStrings, err := GetDnsAnswerStrings(ctxForDownstream, domain, dns.TypeTXT, dnsClient, dnsServerAddress)
 	if err != nil {
-		return nil, motmedelErrors.NewWithTraceCtx(
+		return nil, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("get dns answer strings: %w", err),
 		)
@@ -581,14 +581,14 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = serverAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if client == nil {
-		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return false, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return false, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	ctxForDownstream := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
@@ -602,7 +602,7 @@ func DomainExists(ctx context.Context, domain string, client *dns.Client, server
 				return false, nil
 			}
 		}
-		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("get dns answers: %w", err))
+		return false, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, fmt.Errorf("get dns answers: %w", err))
 	}
 
 	return true, nil
@@ -620,14 +620,14 @@ func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serv
 	if dnsContext.ServerAddress == "" {
 		dnsContext.ServerAddress = serverAddress
 	}
-	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(context.Background(), dnsContext)
+	ctxWithDnsContext := dnsUtilsContext.WithDnsContextValue(ctx, dnsContext)
 
 	if client == nil {
-		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
+		return false, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, nil_error.New("dns client"))
 	}
 
 	if serverAddress == "" {
-		return false, motmedelErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
+		return false, altshiftErrors.NewWithTraceCtx(ctxWithDnsContext, empty_error.New("dns server"))
 	}
 
 	message := new(dns.Msg)
@@ -646,7 +646,7 @@ func SupportsDnssec(ctx context.Context, domain string, client *dns.Client, serv
 
 	answers, err := GetDnsAnswersWithMessage(ctxForDownstream, message, client, serverAddress)
 	if err != nil {
-		return false, motmedelErrors.NewWithTraceCtx(
+		return false, altshiftErrors.NewWithTraceCtx(
 			ctxWithDnsContext,
 			fmt.Errorf("get dns answers with message: %w", err),
 		)

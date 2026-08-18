@@ -8,6 +8,8 @@ import (
 )
 
 func TestRcodeError_Error_KnownRcode(t *testing.T) {
+	t.Parallel()
+
 	err := &RcodeError{Rcode: dns.RcodeNameError}
 	got := err.Error()
 	want := "unsuccessful rcode: 3 (NXDOMAIN)"
@@ -17,6 +19,8 @@ func TestRcodeError_Error_KnownRcode(t *testing.T) {
 }
 
 func TestRcodeError_Error_UnknownRcode(t *testing.T) {
+	t.Parallel()
+
 	err := &RcodeError{Rcode: 9999}
 	got := err.Error()
 	want := "unsuccessful rcode: 9999"
@@ -26,6 +30,8 @@ func TestRcodeError_Error_UnknownRcode(t *testing.T) {
 }
 
 func TestRcodeError_Is(t *testing.T) {
+	t.Parallel()
+
 	err := &RcodeError{Rcode: dns.RcodeServerFailure}
 	if !errors.Is(err, ErrUnsuccessfulRcode) {
 		t.Errorf("errors.Is(err, ErrUnsuccessfulRcode) = false, want true")
@@ -36,6 +42,8 @@ func TestRcodeError_Is(t *testing.T) {
 }
 
 func TestRcodeError_AsTarget(t *testing.T) {
+	t.Parallel()
+
 	err := error(&RcodeError{Rcode: dns.RcodeNameError})
 	var target *RcodeError
 	if !errors.As(err, &target) {
@@ -47,6 +55,8 @@ func TestRcodeError_AsTarget(t *testing.T) {
 }
 
 func TestMultipleRecordsError_Error(t *testing.T) {
+	t.Parallel()
+
 	err := &MultipleRecordsError{Records: []string{"a", "b"}}
 	if got, want := err.Error(), "multiple records"; got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
@@ -54,6 +64,8 @@ func TestMultipleRecordsError_Error(t *testing.T) {
 }
 
 func TestMultipleRecordsError_Is(t *testing.T) {
+	t.Parallel()
+
 	err := &MultipleRecordsError{Records: []string{"a"}}
 	if !errors.Is(err, ErrMultipleRecords) {
 		t.Errorf("errors.Is(err, ErrMultipleRecords) = false, want true")
@@ -64,6 +76,8 @@ func TestMultipleRecordsError_Is(t *testing.T) {
 }
 
 func TestMultipleRecordsError_GetInput(t *testing.T) {
+	t.Parallel()
+
 	records := []string{"x", "y", "z"}
 	err := &MultipleRecordsError{Records: records}
 

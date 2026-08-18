@@ -16,24 +16,24 @@ import (
 	dnsUtilsLog "github.com/Motmedel/dns_utils/pkg/log"
 	dnsUtilsClient "github.com/Motmedel/dns_utils/pkg/types/client"
 	dnsUtilsClientConfig "github.com/Motmedel/dns_utils/pkg/types/client/config"
-	motmedelContext "github.com/Motmedel/utils_go/pkg/context"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	motmedelLog "github.com/Motmedel/utils_go/pkg/log"
-	motmedelErrorLogger "github.com/Motmedel/utils_go/pkg/log/error_logger"
-	motmedelLogHandler "github.com/Motmedel/utils_go/pkg/log/handler"
+	altshiftContext "github.com/altshiftab/utils_go/pkg/context"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
+	altshiftLog "github.com/altshiftab/utils_go/pkg/log"
+	motmedelErrorLogger "github.com/altshiftab/utils_go/pkg/log/error_logger"
+	motmedelLogHandler "github.com/altshiftab/utils_go/pkg/log/handler"
 	"golang.org/x/sync/semaphore"
 )
 
 func main() {
 	logger := &motmedelErrorLogger.Logger{
 		Logger: slog.New(
-			&motmedelLog.ContextHandler{
+			&altshiftLog.ContextHandler{
 				Next: motmedelLogHandler.New(slog.NewJSONHandler(os.Stderr, nil)),
-				Extractors: []motmedelLog.ContextExtractor{
+				Extractors: []altshiftLog.ContextExtractor{
 					dnsUtilsLog.DnsContextExtractor,
-					&motmedelLog.ErrorContextExtractor{
+					&altshiftLog.ErrorContextExtractor{
 						SkipStackTrace: true,
-						ContextExtractors: []motmedelLog.ContextExtractor{
+						ContextExtractors: []altshiftLog.ContextExtractor{
 							dnsUtilsLog.DnsContextExtractor,
 						},
 					},
@@ -63,7 +63,7 @@ func main() {
 		if err != nil {
 			logger.FatalWithExitingMessage(
 				"An error occurred when opening the input file.",
-				motmedelErrors.New(fmt.Errorf("os open (input file): %w", err), inPath),
+				altshiftErrors.New(fmt.Errorf("os open (input file): %w", err), inPath),
 			)
 		}
 	}
@@ -100,7 +100,7 @@ func main() {
 		if err := weightedSemaphore.Acquire(context.Background(), acquireWeight); err != nil {
 			logger.FatalWithExitingMessage(
 				"An error occurred when acquiring the weighted semaphore.",
-				motmedelErrors.New(fmt.Errorf("sempaphore acquire: %w", err), acquireWeight),
+				altshiftErrors.New(fmt.Errorf("sempaphore acquire: %w", err), acquireWeight),
 			)
 		}
 
@@ -113,9 +113,9 @@ func main() {
 			weightedSemaphore.Release(acquireWeight)
 			if err != nil {
 				logger.WarnContext(
-					motmedelContext.WithError(
+					altshiftContext.WithError(
 						ctx,
-						motmedelErrors.New(
+						altshiftErrors.New(
 							fmt.Errorf("supports dnssec: %w", err),
 							domain,
 						),

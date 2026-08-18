@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
-	spfParsing "github.com/Motmedel/utils_go/pkg/dns/parsing/spf"
-	dnsTypes "github.com/Motmedel/utils_go/pkg/dns/types"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/dns/spf"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
 
@@ -24,10 +23,11 @@ func (c *Client) GetSpfRecordString(ctx context.Context, domain string) (string,
 
 	var rcodeError *dnsUtilsErrors.RcodeError
 
-	prefix := dnsTypes.SpfPrefix
+	prefix := spf.Prefix
 	recordStrings, err := c.GetPrefixedTxtRecordStrings(ctx, domain, prefix)
-	if err != nil && !(errors.As(err, &rcodeError) && rcodeError.Rcode == dns.RcodeNameError) {
-		return "", motmedelErrors.New(
+	rcodeError, isRcodeError := errors.AsType[*dnsUtilsErrors.RcodeError](err)
+	if err != nil && (!isRcodeError || rcodeError.Rcode != dns.RcodeNameError) {
+		return "", altshiftErrors.New(
 			fmt.Errorf("get prefixed txt record strings: %w", err),
 			domain, prefix,
 		)
@@ -42,7 +42,7 @@ func (c *Client) GetSpfRecordString(ctx context.Context, domain string) (string,
 	return recordStrings[0], nil
 }
 
-func (c *Client) GetSpfRecord(ctx context.Context, domain string) (*dnsTypes.SpfRecord, error) {
+func (c *Client) GetSpfRecord(ctx context.Context, domain string) (*spf.Record, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -62,10 +62,10 @@ func (c *Client) GetSpfRecord(ctx context.Context, domain string) (*dnsTypes.Spf
 	}
 
 	recordBytes := []byte(recordString)
-	record, err := spfParsing.ParseSpfRecord(recordBytes)
+	record, err := spf.ParseSpfRecord(recordBytes)
 	if err != nil {
-		record = &dnsTypes.SpfRecord{Raw: recordString, Domain: domain}
-		return record, motmedelErrors.New(fmt.Errorf("parse spf record: %w", err), recordBytes)
+		record = &spf.Record{Raw: recordString, Domain: domain}
+		return record, altshiftErrors.New(fmt.Errorf("parse spf record: %w", err), recordBytes)
 	}
 	if record == nil {
 		return nil, nil

@@ -11,19 +11,23 @@ import (
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
-	"github.com/Motmedel/utils_go/pkg/errors/types/empty_error"
-	"github.com/Motmedel/utils_go/pkg/errors/types/nil_error"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/errors/types/empty_error"
+	"github.com/altshiftab/utils_go/pkg/errors/types/nil_error"
 	"github.com/miekg/dns"
 )
 
 func TestGetFlagsFromMessage_Nil(t *testing.T) {
+	t.Parallel()
+
 	if got := GetFlagsFromMessage(nil); got != nil {
 		t.Errorf("GetFlagsFromMessage(nil) = %v, want nil", got)
 	}
 }
 
 func TestGetFlagsFromMessage_AllSet(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.Authoritative = true
 	msg.AuthenticatedData = true
@@ -44,6 +48,8 @@ func TestGetFlagsFromMessage_AllSet(t *testing.T) {
 }
 
 func TestGetFlagsFromMessage_NoFlags(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	if got := GetFlagsFromMessage(msg); got != nil {
 		t.Errorf("GetFlagsFromMessage(empty) = %v, want nil", got)
@@ -51,6 +57,8 @@ func TestGetFlagsFromMessage_NoFlags(t *testing.T) {
 }
 
 func TestGetFlagsFromMessage_OptWithoutDO(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.RecursionDesired = true
 	opt := &dns.OPT{Hdr: dns.RR_Header{Name: ".", Rrtype: dns.TypeOPT}}
@@ -71,11 +79,15 @@ func makeA(ttl uint32, ip string) *dns.A {
 }
 
 func TestApplyRemainingTtl_Nil(t *testing.T) {
+	t.Parallel()
+
 	// Should not panic
 	ApplyRemainingTtl(nil, 42)
 }
 
 func TestApplyRemainingTtl_RewritesAllSections(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{
 		Answer: []dns.RR{makeA(100, "1.2.3.4"), nil, makeA(200, "5.6.7.8")},
 		Ns:     []dns.RR{makeA(300, "9.9.9.9")},
@@ -100,6 +112,8 @@ func TestApplyRemainingTtl_RewritesAllSections(t *testing.T) {
 }
 
 func TestApplyRemainingTtl_PreservesOptEdnsFlags(t *testing.T) {
+	t.Parallel()
+
 	// The OPT pseudo-record's "Ttl" field encodes
 	// (extended-rcode, version, DO, Z) per RFC 6891. Rewriting it would
 	// strip the DO bit and corrupt the MBZ field, breaking DNSSEC
@@ -126,12 +140,16 @@ func TestApplyRemainingTtl_PreservesOptEdnsFlags(t *testing.T) {
 }
 
 func TestEffectiveMessageTtl_Nil(t *testing.T) {
+	t.Parallel()
+
 	if got := EffectiveMessageTtl(nil); got != 0 {
 		t.Errorf("EffectiveMessageTtl(nil) = %v, want 0", got)
 	}
 }
 
 func TestEffectiveMessageTtl_MinAcrossSections(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{
 		Answer: []dns.RR{makeA(300, "1.1.1.1"), makeA(60, "2.2.2.2")},
 		Ns:     []dns.RR{makeA(120, "3.3.3.3")},
@@ -144,6 +162,8 @@ func TestEffectiveMessageTtl_MinAcrossSections(t *testing.T) {
 }
 
 func TestEffectiveMessageTtl_IgnoresOpt(t *testing.T) {
+	t.Parallel()
+
 	opt := &dns.OPT{Hdr: dns.RR_Header{Name: ".", Rrtype: dns.TypeOPT, Ttl: 0}}
 	msg := &dns.Msg{
 		Answer: []dns.RR{makeA(150, "1.1.1.1")},
@@ -156,6 +176,8 @@ func TestEffectiveMessageTtl_IgnoresOpt(t *testing.T) {
 }
 
 func TestEffectiveMessageTtl_NXDOMAINUsesSoaMinttl(t *testing.T) {
+	t.Parallel()
+
 	soa := &dns.SOA{
 		Hdr:    dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
 		Minttl: 30,
@@ -171,6 +193,8 @@ func TestEffectiveMessageTtl_NXDOMAINUsesSoaMinttl(t *testing.T) {
 }
 
 func TestGetAnswerString(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		rr   dns.RR
@@ -215,6 +239,8 @@ func TestGetAnswerString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if got := GetAnswerString(tt.rr); got != tt.want {
 				t.Errorf("GetAnswerString = %q, want %q", got, tt.want)
 			}
@@ -223,6 +249,8 @@ func TestGetAnswerString(t *testing.T) {
 }
 
 func TestGetAnswerString_NilA(t *testing.T) {
+	t.Parallel()
+
 	if got := GetAnswerString(&dns.A{}); got != "" {
 		t.Errorf("GetAnswerString(&dns.A{}) = %q, want empty", got)
 	}
@@ -266,9 +294,9 @@ func assertEmptyField(t *testing.T, err error, field string) {
 func extractDnsContext(t *testing.T, err error) *dnsUtilsTypes.DnsContext {
 	t.Helper()
 
-	var extErr *motmedelErrors.ExtendedError
+	var extErr *altshiftErrors.ExtendedError
 	if !errors.As(err, &extErr) {
-		t.Fatalf("expected *motmedelErrors.ExtendedError, got %T (%v)", err, err)
+		t.Fatalf("expected *altshiftErrors.ExtendedError, got %T (%v)", err, err)
 	}
 	ctxPtr := extErr.GetContext()
 	if ctxPtr == nil {
@@ -282,6 +310,8 @@ func extractDnsContext(t *testing.T, err error) *dnsUtilsTypes.DnsContext {
 }
 
 func TestExchange_NilMessage(t *testing.T) {
+	t.Parallel()
+
 	got, err := Exchange(context.Background(), nil, &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -292,16 +322,22 @@ func TestExchange_NilMessage(t *testing.T) {
 }
 
 func TestExchange_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := Exchange(context.Background(), &dns.Msg{}, nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestExchange_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := Exchange(context.Background(), &dns.Msg{}, &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
 
 func TestExchangeWithConn_NilMessage(t *testing.T) {
+	t.Parallel()
+
 	got, err := ExchangeWithConn(context.Background(), nil, &dns.Client{}, &dns.Conn{})
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -312,16 +348,22 @@ func TestExchangeWithConn_NilMessage(t *testing.T) {
 }
 
 func TestExchangeWithConn_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := ExchangeWithConn(context.Background(), &dns.Msg{}, nil, &dns.Conn{})
 	assertNilField(t, err, "dns client")
 }
 
 func TestExchangeWithConn_NilConnection(t *testing.T) {
+	t.Parallel()
+
 	_, err := ExchangeWithConn(context.Background(), &dns.Msg{}, &dns.Client{}, nil)
 	assertNilField(t, err, "connection")
 }
 
 func TestGetDnsAnswersWithMessage_NilMessage(t *testing.T) {
+	t.Parallel()
+
 	got, err := GetDnsAnswersWithMessage(context.Background(), nil, &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -332,16 +374,22 @@ func TestGetDnsAnswersWithMessage_NilMessage(t *testing.T) {
 }
 
 func TestGetDnsAnswersWithMessage_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswersWithMessage(context.Background(), &dns.Msg{}, nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestGetDnsAnswersWithMessage_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswersWithMessage(context.Background(), &dns.Msg{}, &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
 
 func TestGetDnsAnswers_EmptyDomain(t *testing.T) {
+	t.Parallel()
+
 	got, err := GetDnsAnswers(context.Background(), "", dns.TypeA, &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -352,6 +400,8 @@ func TestGetDnsAnswers_EmptyDomain(t *testing.T) {
 }
 
 func TestGetDnsAnswers_UnsetRecordType(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswers(context.Background(), "example.com", 0, &dns.Client{}, "1.2.3.4:53")
 	if !errors.Is(err, dnsUtilsErrors.ErrUnsetRecordType) {
 		t.Errorf("err = %v, want ErrUnsetRecordType", err)
@@ -359,16 +409,22 @@ func TestGetDnsAnswers_UnsetRecordType(t *testing.T) {
 }
 
 func TestGetDnsAnswers_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswers(context.Background(), "example.com", dns.TypeA, nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestGetDnsAnswers_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswers(context.Background(), "example.com", dns.TypeA, &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
 
 func TestGetDnsAnswerStrings_EmptyDomain(t *testing.T) {
+	t.Parallel()
+
 	got, err := GetDnsAnswerStrings(context.Background(), "", dns.TypeA, &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -379,6 +435,8 @@ func TestGetDnsAnswerStrings_EmptyDomain(t *testing.T) {
 }
 
 func TestGetDnsAnswerStrings_UnsetRecordType(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswerStrings(context.Background(), "example.com", 0, &dns.Client{}, "1.2.3.4:53")
 	if !errors.Is(err, dnsUtilsErrors.ErrUnsetRecordType) {
 		t.Errorf("err = %v, want ErrUnsetRecordType", err)
@@ -386,16 +444,22 @@ func TestGetDnsAnswerStrings_UnsetRecordType(t *testing.T) {
 }
 
 func TestGetDnsAnswerStrings_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswerStrings(context.Background(), "example.com", dns.TypeA, nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestGetDnsAnswerStrings_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswerStrings(context.Background(), "example.com", dns.TypeA, &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
 
 func TestGetPrefixedTxtRecordStrings_EmptyDomain(t *testing.T) {
+	t.Parallel()
+
 	got, err := GetPrefixedTxtRecordStrings(context.Background(), "", "v=", &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -406,16 +470,22 @@ func TestGetPrefixedTxtRecordStrings_EmptyDomain(t *testing.T) {
 }
 
 func TestGetPrefixedTxtRecordStrings_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetPrefixedTxtRecordStrings(context.Background(), "example.com", "v=", nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestGetPrefixedTxtRecordStrings_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetPrefixedTxtRecordStrings(context.Background(), "example.com", "v=", &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
 
 func TestDomainExists_EmptyDomain(t *testing.T) {
+	t.Parallel()
+
 	ok, err := DomainExists(context.Background(), "", &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -426,16 +496,22 @@ func TestDomainExists_EmptyDomain(t *testing.T) {
 }
 
 func TestDomainExists_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := DomainExists(context.Background(), "example.com", nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestDomainExists_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := DomainExists(context.Background(), "example.com", &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
 
 func TestSupportsDnssec_EmptyDomain(t *testing.T) {
+	t.Parallel()
+
 	ok, err := SupportsDnssec(context.Background(), "", &dns.Client{}, "1.2.3.4:53")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -446,11 +522,15 @@ func TestSupportsDnssec_EmptyDomain(t *testing.T) {
 }
 
 func TestSupportsDnssec_NilClient(t *testing.T) {
+	t.Parallel()
+
 	_, err := SupportsDnssec(context.Background(), "example.com", nil, "1.2.3.4:53")
 	assertNilField(t, err, "dns client")
 }
 
 func TestSupportsDnssec_EmptyServer(t *testing.T) {
+	t.Parallel()
+
 	_, err := SupportsDnssec(context.Background(), "example.com", &dns.Client{}, "")
 	assertEmptyField(t, err, "dns server")
 }
@@ -460,6 +540,8 @@ func TestSupportsDnssec_EmptyServer(t *testing.T) {
 // whatever information was available at failure time.
 
 func TestExchange_Error_AttachesDnsContextWithQuestion(t *testing.T) {
+	t.Parallel()
+
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
 
@@ -475,6 +557,8 @@ func TestExchange_Error_AttachesDnsContextWithQuestion(t *testing.T) {
 }
 
 func TestExchange_Error_ReusesExistingDnsContext(t *testing.T) {
+	t.Parallel()
+
 	existing := &dnsUtilsTypes.DnsContext{}
 	ctx := dnsUtilsContext.WithDnsContextValue(context.Background(), existing)
 
@@ -493,6 +577,8 @@ func TestExchange_Error_ReusesExistingDnsContext(t *testing.T) {
 }
 
 func TestExchangeWithConn_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
 
@@ -505,6 +591,8 @@ func TestExchangeWithConn_Error_AttachesDnsContext(t *testing.T) {
 }
 
 func TestGetDnsAnswersWithMessage_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn("example.com"), dns.TypeA)
 
@@ -520,6 +608,8 @@ func TestGetDnsAnswersWithMessage_Error_AttachesDnsContext(t *testing.T) {
 }
 
 func TestGetDnsAnswers_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswers(context.Background(), "example.com", dns.TypeA, nil, "1.2.3.4:53")
 	dnsCtx := extractDnsContext(t, err)
 
@@ -529,6 +619,8 @@ func TestGetDnsAnswers_Error_AttachesDnsContext(t *testing.T) {
 }
 
 func TestGetDnsAnswers_UnsetRecordType_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswers(context.Background(), "example.com", 0, &dns.Client{}, "1.2.3.4:53")
 	if !errors.Is(err, dnsUtilsErrors.ErrUnsetRecordType) {
 		t.Fatalf("err = %v, want ErrUnsetRecordType", err)
@@ -540,6 +632,8 @@ func TestGetDnsAnswers_UnsetRecordType_AttachesDnsContext(t *testing.T) {
 }
 
 func TestGetDnsAnswerStrings_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetDnsAnswerStrings(context.Background(), "example.com", dns.TypeA, nil, "1.2.3.4:53")
 	dnsCtx := extractDnsContext(t, err)
 
@@ -549,6 +643,8 @@ func TestGetDnsAnswerStrings_Error_AttachesDnsContext(t *testing.T) {
 }
 
 func TestGetPrefixedTxtRecordStrings_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	_, err := GetPrefixedTxtRecordStrings(context.Background(), "example.com", "v=", nil, "1.2.3.4:53")
 	dnsCtx := extractDnsContext(t, err)
 
@@ -558,6 +654,8 @@ func TestGetPrefixedTxtRecordStrings_Error_AttachesDnsContext(t *testing.T) {
 }
 
 func TestDomainExists_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	_, err := DomainExists(context.Background(), "example.com", nil, "1.2.3.4:53")
 	dnsCtx := extractDnsContext(t, err)
 
@@ -567,6 +665,8 @@ func TestDomainExists_Error_AttachesDnsContext(t *testing.T) {
 }
 
 func TestSupportsDnssec_Error_AttachesDnsContext(t *testing.T) {
+	t.Parallel()
+
 	_, err := SupportsDnssec(context.Background(), "example.com", nil, "1.2.3.4:53")
 	dnsCtx := extractDnsContext(t, err)
 

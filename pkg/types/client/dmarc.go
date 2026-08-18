@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	dnsUtilsErrors "github.com/Motmedel/dns_utils/pkg/errors"
-	dmarcParsing "github.com/Motmedel/utils_go/pkg/dns/parsing/dmarc"
-	dnsTypes "github.com/Motmedel/utils_go/pkg/dns/types"
-	motmedelErrors "github.com/Motmedel/utils_go/pkg/errors"
+	"github.com/altshiftab/utils_go/pkg/dns/dmarc"
+	altshiftErrors "github.com/altshiftab/utils_go/pkg/errors"
 	"github.com/miekg/dns"
 )
 
@@ -34,10 +33,11 @@ func (c *Client) GetDmarcRecordStringWithSubdomain(
 
 	var rcodeError *dnsUtilsErrors.RcodeError
 
-	prefix := dnsTypes.DmarcPrefix
+	prefix := dmarc.Prefix
 	recordStrings, err := c.GetPrefixedTxtRecordStrings(ctx, subdomain, prefix)
-	if err != nil && !(errors.As(err, &rcodeError) && rcodeError.Rcode == dns.RcodeNameError) {
-		return "", motmedelErrors.New(
+	rcodeError, isRcodeError := errors.AsType[*dnsUtilsErrors.RcodeError](err)
+	if err != nil && (!isRcodeError || rcodeError.Rcode != dns.RcodeNameError) {
+		return "", altshiftErrors.New(
 			fmt.Errorf("get prefixed txt record strings: %w", err),
 			subdomain, prefix,
 		)
@@ -55,7 +55,7 @@ func (c *Client) GetDmarcRecordStringWithSubdomain(
 func (c *Client) GetDmarcRecordWithSubdomain(
 	ctx context.Context,
 	subdomain string,
-) (*dnsTypes.DmarcRecord, error) {
+) (*dmarc.Record, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (c *Client) GetDmarcRecordWithSubdomain(
 
 	recordString, err := c.GetDmarcRecordStringWithSubdomain(ctx, subdomain)
 	if err != nil {
-		return nil, motmedelErrors.New(
+		return nil, altshiftErrors.New(
 			fmt.Errorf("get record string with subdomain: %w", err),
 			subdomain,
 		)
@@ -76,10 +76,10 @@ func (c *Client) GetDmarcRecordWithSubdomain(
 	}
 
 	recordBytes := []byte(recordString)
-	record, err := dmarcParsing.ParseDmarcRecord(recordBytes)
+	record, err := dmarc.ParseDmarcRecord(recordBytes)
 	if err != nil {
-		record = &dnsTypes.DmarcRecord{Raw: recordString}
-		return record, motmedelErrors.New(fmt.Errorf("parse dmarc record: %w", err), recordBytes)
+		record = &dmarc.Record{Raw: recordString}
+		return record, altshiftErrors.New(fmt.Errorf("parse dmarc record: %w", err), recordBytes)
 	}
 
 	return record, nil
@@ -88,7 +88,7 @@ func (c *Client) GetDmarcRecordWithSubdomain(
 func (c *Client) GetDmarcRecord(
 	ctx context.Context,
 	domain string,
-) (*dnsTypes.DmarcRecord, error) {
+) (*dmarc.Record, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (c *Client) GetDmarcRecord(
 		if record != nil {
 			record.Domain = domain
 		}
-		return record, motmedelErrors.New(fmt.Errorf("get record with subdomain: %w", err), subdomain)
+		return record, altshiftErrors.New(fmt.Errorf("get record with subdomain: %w", err), subdomain)
 	}
 	if record == nil {
 		return nil, nil

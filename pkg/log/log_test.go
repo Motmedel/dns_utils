@@ -9,8 +9,8 @@ import (
 
 	dnsUtilsContext "github.com/Motmedel/dns_utils/pkg/context"
 	dnsUtilsTypes "github.com/Motmedel/dns_utils/pkg/types"
-	"github.com/Motmedel/utils_go/pkg/net/types/flow_tuple"
-	"github.com/Motmedel/utils_go/pkg/schema"
+	"github.com/altshiftab/utils_go/pkg/net/types/flow_tuple"
+	"github.com/altshiftab/utils_go/pkg/schema"
 	"github.com/miekg/dns"
 )
 
@@ -29,11 +29,15 @@ func makeAAAA(name string, ttl uint32, ip string) *dns.AAAA {
 }
 
 func TestEnrichWithDnsMessage_NilBase(t *testing.T) {
+	t.Parallel()
+
 	// Should not panic.
 	EnrichWithDnsMessage(nil, &dns.Msg{})
 }
 
 func TestEnrichWithDnsMessage_NilMessage(t *testing.T) {
+	t.Parallel()
+
 	base := &schema.Base{}
 	EnrichWithDnsMessage(base, nil)
 	if base.Dns != nil {
@@ -42,6 +46,8 @@ func TestEnrichWithDnsMessage_NilMessage(t *testing.T) {
 }
 
 func TestEnrichWithDnsMessage_QuestionOnly(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.RecursionDesired = true
 	msg.SetQuestion("www.example.com.", dns.TypeA)
@@ -93,6 +99,8 @@ func TestEnrichWithDnsMessage_QuestionOnly(t *testing.T) {
 }
 
 func TestEnrichWithDnsMessage_AnswerWithResolvedIps(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.Id = 7
 	msg.Response = true
@@ -149,6 +157,8 @@ func TestEnrichWithDnsMessage_AnswerWithResolvedIps(t *testing.T) {
 }
 
 func TestEnrichWithDnsMessage_PreservesExistingDns(t *testing.T) {
+	t.Parallel()
+
 	existing := &schema.Dns{Id: "existing"}
 	base := &schema.Base{Dns: existing}
 
@@ -167,12 +177,16 @@ func TestEnrichWithDnsMessage_PreservesExistingDns(t *testing.T) {
 }
 
 func TestParseDnsMessage_Nil(t *testing.T) {
+	t.Parallel()
+
 	if got := ParseDnsMessage(nil); got != nil {
 		t.Errorf("ParseDnsMessage(nil) = %v, want nil", got)
 	}
 }
 
 func TestParseDnsMessage_SetsDnsProtocol(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.SetQuestion("example.com.", dns.TypeA)
 
@@ -189,18 +203,24 @@ func TestParseDnsMessage_SetsDnsProtocol(t *testing.T) {
 }
 
 func TestParseDnsContext_Nil(t *testing.T) {
+	t.Parallel()
+
 	if got := ParseDnsContext(nil); got != nil {
 		t.Errorf("ParseDnsContext(nil) = %v, want nil", got)
 	}
 }
 
 func TestParseDnsContext_NoMessages(t *testing.T) {
+	t.Parallel()
+
 	if got := ParseDnsContext(&dnsUtilsTypes.DnsContext{Transport: "udp"}); got != nil {
 		t.Errorf("ParseDnsContext(no messages) = %v, want nil", got)
 	}
 }
 
 func TestParseDnsContext_PrefersAnswerMessage(t *testing.T) {
+	t.Parallel()
+
 	question := &dns.Msg{}
 	question.SetQuestion("example.com.", dns.TypeA)
 
@@ -223,6 +243,8 @@ func TestParseDnsContext_PrefersAnswerMessage(t *testing.T) {
 }
 
 func TestParseDnsContext_FallsBackToQuestionMessage(t *testing.T) {
+	t.Parallel()
+
 	question := &dns.Msg{}
 	question.SetQuestion("example.com.", dns.TypeA)
 
@@ -239,6 +261,8 @@ func TestParseDnsContext_FallsBackToQuestionMessage(t *testing.T) {
 }
 
 func TestParseDnsContext_TransportDefaults(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.SetQuestion("example.com.", dns.TypeA)
 
@@ -256,6 +280,8 @@ func TestParseDnsContext_TransportDefaults(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			base := ParseDnsContext(&dnsUtilsTypes.DnsContext{
 				QuestionMessage: msg,
 				Transport:       tt.transport,
@@ -274,6 +300,8 @@ func TestParseDnsContext_TransportDefaults(t *testing.T) {
 }
 
 func TestParseDnsContext_ParsesAddresses(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.SetQuestion("example.com.", dns.TypeA)
 
@@ -329,6 +357,8 @@ func TestParseDnsContext_ParsesAddresses(t *testing.T) {
 }
 
 func TestParseDnsContext_HostnameAddress(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.SetQuestion("example.com.", dns.TypeA)
 
@@ -352,6 +382,8 @@ func TestParseDnsContext_HostnameAddress(t *testing.T) {
 }
 
 func TestParseDnsContext_NoAddresses(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.SetQuestion("example.com.", dns.TypeA)
 
@@ -371,6 +403,8 @@ func TestParseDnsContext_NoAddresses(t *testing.T) {
 }
 
 func TestExtractDnsContext_NoContext(t *testing.T) {
+	t.Parallel()
+
 	rec := slog.Record{}
 	if err := ExtractDnsContext(context.Background(), &rec); err != nil {
 		t.Errorf("err = %v, want nil", err)
@@ -381,6 +415,8 @@ func TestExtractDnsContext_NoContext(t *testing.T) {
 }
 
 func TestExtractDnsContext_EmitsAttrs(t *testing.T) {
+	t.Parallel()
+
 	msg := &dns.Msg{}
 	msg.Id = 1
 	msg.SetQuestion("example.com.", dns.TypeA)
@@ -417,6 +453,8 @@ func TestExtractDnsContext_EmitsAttrs(t *testing.T) {
 }
 
 func TestExtractDnsContext_WrongContextValue(t *testing.T) {
+	t.Parallel()
+
 	// Context key present but with a nil *DnsContext → no attrs, no error.
 	ctx := context.WithValue(context.Background(), dnsUtilsContext.DnsContextKey, (*dnsUtilsTypes.DnsContext)(nil))
 	rec := slog.Record{}
