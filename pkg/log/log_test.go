@@ -243,10 +243,10 @@ func TestParseDnsContext_TransportDefaults(t *testing.T) {
 	msg.SetQuestion("example.com.", dns.TypeA)
 
 	tests := []struct {
-		name       string
-		transport  string
-		wantTrans  string
-		wantIana   string
+		name      string
+		transport string
+		wantTrans string
+		wantIana  string
 	}{
 		{"empty defaults to udp", "", "udp", "17"},
 		{"udp", "udp", "udp", "17"},

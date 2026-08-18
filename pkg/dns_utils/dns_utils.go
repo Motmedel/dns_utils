@@ -238,8 +238,13 @@ func ExchangeWithConn(ctx context.Context, message *dns.Msg, client *dns.Client,
 	}
 
 	// Exchange
+	//
+	// The context-aware form takes the earlier of the caller's deadline and the
+	// client's own timeout, so a caller that bounds a query gets the bound it
+	// asked for. Without it the client's timeout applied regardless, and a
+	// caller cancelling had to wait for it.
 
-	responseMessage, _, err := client.ExchangeWithConn(message, connection)
+	responseMessage, _, err := client.ExchangeWithConnContext(ctx, message, connection)
 
 	// Populate the DNS context.
 
