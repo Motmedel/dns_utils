@@ -1,10 +1,10 @@
 module github.com/Motmedel/dns_utils/pkg/quic
 
-go 1.25.0
+go 1.26
 
 require (
-	github.com/Motmedel/dns_utils v0.0.50
-	github.com/Motmedel/utils_go v0.0.457
+	github.com/Motmedel/dns_utils v0.0.58
+	github.com/altshiftab/utils_go v1.26.0
 	github.com/miekg/dns v1.1.72
 	github.com/quic-go/quic-go v0.59.0
 )
